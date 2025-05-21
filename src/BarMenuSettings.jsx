@@ -23,6 +23,8 @@ function BarMenuSettings({ action, changeHorlogeStyle }) {
         padding: "32px",
         boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
         fontFamily: "Segoe UI, sans-serif",
+        marginTop: "10px",
+        borderRadius: "20px",
       }}
     >
       <button
@@ -66,15 +68,6 @@ function BarMenuSettings({ action, changeHorlogeStyle }) {
             style={{ marginRight: "8px" }}
           />
           Dark Mode
-        </label>
-        <label style={{ flex: 1, cursor: "pointer" }}>
-          <input
-            type="checkbox"
-            checked={compactMode}
-            onChange={() => setCompactMode((v) => !v)}
-            style={{ marginRight: "8px" }}
-          />
-          Compact Mode
         </label>
       </div>
 
