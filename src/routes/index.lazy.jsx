@@ -31,11 +31,11 @@ function RouteComponent() {
   };
   const changingBarStatus = () => {
     setShowBarSettings((e) => !e);
-    console.log(showBarSettings, "good?");
+    // console.log(showBarSettings, "good?");
   };
 
   const changeHorloge = () => {
-    console.log(horlogeType);
+    // console.log(horlogeType);
     sethorlogeType(horlogeType + 1);
     if (horlogeType > 1) {
       sethorlogeType(0);
@@ -55,7 +55,7 @@ function RouteComponent() {
   const handleSaveShortcut = async () => {
     await new Promise((resolve) => setTimeout(resolve, 5)); // Wait for 10 seconds
     const shortcuts = await getShortcuts();
-    console.log(shortcuts); // Check if the shortcuts have changed
+    // console.log(shortcuts); // Check if the shortcuts have changed
     setShortcuts(shortcuts);
   };
 
@@ -73,7 +73,7 @@ function RouteComponent() {
         sc.id === updatedShortcut.id ? { ...sc, ...updatedShortcut } : sc
       )
     );
-    console.log("updated here");
+    // console.log("updated here");
   };
 
   return (
