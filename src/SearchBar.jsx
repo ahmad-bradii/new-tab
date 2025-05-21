@@ -12,7 +12,9 @@ const SearchBar = () => {
   // Mock API call (replace with real API)
   const fetchSuggestions = async (searchTerm) => {
     let mockResults = [];
-    await fetch(`/api/suggestions?q=${searchTerm}`)
+    await fetch(
+      `https://search-api-r2w3.onrender.com/api/suggestions?q=${searchTerm}`
+    )
       .then((response) => response.json())
       .then((data) => {
         mockResults = data;
