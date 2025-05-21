@@ -8,9 +8,9 @@ export const Route = createRootRoute({
         <div>
           <Outlet />
         </div>
-
+        {/* 
         <TanStackRouterDevtools />
-        <ReactQueryDevtools />
+        <ReactQueryDevtools /> */}
       </>
     );
   },
