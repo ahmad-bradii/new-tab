@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Main Browser Page",
+  "version": "1.0",
+  "description": "A custom browser page built with Vite and React.",
+  "permissions": [],
+  "host_permissions": [],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "Main Browser Page"
+  },
+  "icons": {
+    "16": "icon-16.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  }
+}

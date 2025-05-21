@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "My Custom Browser Page",
+  "version": "1.0",
+  "description": "Main page as a browser extension",
+  "action": {
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "icon.png",
+      "48": "icon.png",
+      "128": "icon.png"
+    }
+  },
+  "chrome_url_overrides": {
+    "homepage": "index.html"
+  },
+  "permissions": ["storage"],
+  "host_permissions": ["*://*/*"]
+}
