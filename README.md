@@ -36,13 +36,7 @@ Welcome to your **next-level browser start page**!
 
 ### **Preview the project:** [Try the live site](https://new-tab-rust.vercel.app/)
 
-## 🎬 Demo
-
-<div align="center">
-
-<video src="./readme_src/vid.mp4" controls width="600"></video>
-
-</div>
+[![Demo Video](./readme_src/img.webp)](https://new-tab-rust.vercel.app/ "Click to watch the demo")
 
 ---
 
