@@ -4,6 +4,10 @@
 ![Demo](https://img.shields.io/badge/demo-available-blue)
 ![License](https://img.shields.io/badge/license-mit-green)
 
+> ### ⚠️ **Note:** This project is **not completed yet**.
+
+> ### ⚠️ New features and style improvements are coming soon!
+
 Welcome to your **next-level browser start page**!  
 ✨ Personalize your new tab with widgets, shortcuts, and real-time info—everything you need, right where you want it.
 
@@ -41,11 +45,6 @@ Welcome to your **next-level browser start page**!
 </div>
 
 ---
-
-## ⚠️ Project Status
-
-> **Note:** This project is **not completed yet**.  
-> New features and style improvements are coming soon!
 
 ---
 
