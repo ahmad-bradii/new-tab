@@ -7,7 +7,12 @@ import WeatherWithPray from "../WeatherWithPray";
 import SearchBar from "../SearchBar";
 import Header from "../Header";
 import ShortcutIcon, { AddShortcutButton } from "../ShortcutIcon";
-import { getShortcuts, deleteShortcut } from "../dbHelper";
+import {
+  getShortcuts,
+  deleteShortcut,
+  updateShortcutsOrder,
+  initializeShortcutsOrder,
+} from "../dbHelper";
 import AddShortcut from "../AddShortcuts";
 import { useState, useEffect } from "react"; // Removed
 import BarMenuSettings from "../BarMenuSettings";
@@ -19,11 +24,11 @@ export const Route = createLazyFileRoute("/")({
 
 function RouteComponent() {
   // Removed 'async'
-  const [countryName, setCountryName] = useState("sfax");
   const [shortcuts, setShortcuts] = useState([]);
   const [horlogeType, sethorlogeType] = useState(0);
   const [showAddShortcut, setShowAddShortcut] = useState(false);
   const [showBarSettings, setShowBarSettings] = useState(false);
+  const [draggedItem, setDraggedItem] = useState(null);
   // Removed unused horlogeType state
 
   const changingStatus = () => {
@@ -45,7 +50,15 @@ function RouteComponent() {
 
   useEffect(() => {
     const fetchShortcuts = async () => {
+      // Initialize order for existing shortcuts that don't have it
+      await initializeShortcutsOrder();
+
+      // Get shortcuts (now sorted by order)
       const shortcuts = await getShortcuts();
+      console.log(
+        "Loaded shortcuts with order:",
+        shortcuts.map((s) => ({ id: s.id, label: s.label, order: s.order }))
+      );
       setShortcuts(shortcuts);
     };
 
@@ -53,9 +66,12 @@ function RouteComponent() {
   }, []);
 
   const handleSaveShortcut = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 5)); // Wait for 10 seconds
-    const shortcuts = await getShortcuts();
-    // console.log(shortcuts); // Check if the shortcuts have changed
+    await new Promise((resolve) => setTimeout(resolve, 5)); // Wait for 5ms
+    const shortcuts = await getShortcuts(); // This will now return sorted shortcuts
+    console.log(
+      "Reloaded shortcuts after save:",
+      shortcuts.map((s) => ({ id: s.id, label: s.label, order: s.order }))
+    );
     setShortcuts(shortcuts);
   };
 
@@ -74,6 +90,47 @@ function RouteComponent() {
       )
     );
     // console.log("updated here");
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (id) => {
+    setDraggedItem(id);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+  };
+
+  const handleDrop = async (targetId) => {
+    if (draggedItem === null || draggedItem === targetId) return;
+
+    const draggedIndex = shortcuts.findIndex((s) => s.id === draggedItem);
+    const targetIndex = shortcuts.findIndex((s) => s.id === targetId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Create new array with reordered items
+    const newShortcuts = [...shortcuts];
+    const [draggedShortcut] = newShortcuts.splice(draggedIndex, 1);
+    newShortcuts.splice(targetIndex, 0, draggedShortcut);
+
+    console.log(
+      "New order after drop:",
+      newShortcuts.map((s) => ({ id: s.id, label: s.label }))
+    );
+
+    // Update state
+    setShortcuts(newShortcuts);
+
+    // Update database
+    try {
+      await updateShortcutsOrder(newShortcuts);
+      console.log("Successfully updated order in database");
+    } catch (error) {
+      console.error("Failed to update shortcuts order:", error);
+      // Revert state on error
+      setShortcuts(shortcuts);
+    }
   };
 
   return (
@@ -105,6 +162,10 @@ function RouteComponent() {
               onDelete={handleDeleteShortcut}
               onUpdate={handleUpdateShortcut}
               changingStatus={changingStatus}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDrop={handleDrop}
+              draggedItem={draggedItem}
             />
           ))}
           <AddShortcutButton targelShortcut={changingStatus} />{" "}

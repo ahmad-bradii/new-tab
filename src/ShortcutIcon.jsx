@@ -2,20 +2,76 @@ import PropTypes from "prop-types";
 import AddShortcut from "./AddShortcuts";
 import { useState } from "react";
 
-const ShortcutIcon = ({ icon, id, label, target, onDelete, onUpdate }) => {
+const ShortcutIcon = ({
+  icon,
+  id,
+  label,
+  target,
+  onDelete,
+  onUpdate,
+  onDragStart,
+  onDragEnd,
+  onDrop,
+  draggedItem,
+}) => {
   const [showShortcutlabel, setShortcutlabel] = useState(true);
   const [showlabel, setshowlable] = useState(true);
+  const [isDraggedOver, setIsDraggedOver] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
   const changingStatus = () => {
     setShortcutlabel((e) => !e);
   };
 
+  const handleDragStart = (e) => {
+    setIsDragging(true);
+    onDragStart(id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+    onDragEnd();
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setIsDraggedOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDraggedOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDraggedOver(false);
+    onDrop(id);
+  };
+
+  const handleLinkClick = (e) => {
+    // Prevent navigation if we just finished dragging
+    if (isDragging) {
+      e.preventDefault();
+    }
+  };
+
+  const isCurrentlyDragged = draggedItem === id;
+
   return (
     <div
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`shortcut_container ${isCurrentlyDragged ? "dragging" : ""} ${isDraggedOver ? "drag-over" : ""}`}
       style={{
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        cursor: "pointer",
         width: "80px",
         height: "80px",
         margin: "10px",
@@ -25,7 +81,6 @@ const ShortcutIcon = ({ icon, id, label, target, onDelete, onUpdate }) => {
       }}
       onMouseEnter={() => setshowlable(false)}
       onMouseLeave={() => setshowlable(true)}
-      className="shortcut_container"
     >
       <button
         className="delte-edit-tab"
@@ -50,16 +105,10 @@ const ShortcutIcon = ({ icon, id, label, target, onDelete, onUpdate }) => {
       <a
         href={target}
         className="shortcut-icon"
+        onClick={handleLinkClick}
         style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          cursor: "pointer",
-          margin: "10px",
-          width: "80px",
-          height: "80px",
-          textAlign: "center",
-          borderRadius: "14px",
+          textDecoration: "none",
+          color: "inherit",
         }}
       >
         <img src={icon} alt={label} className="icon" />
@@ -83,7 +132,13 @@ ShortcutIcon.propTypes = {
   icon: PropTypes.node.isRequired,
   label: PropTypes.string.isRequired,
   target: PropTypes.string.isRequired,
-  onClick: PropTypes.func,
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  onDelete: PropTypes.func,
+  onUpdate: PropTypes.func,
+  onDragStart: PropTypes.func,
+  onDragEnd: PropTypes.func,
+  onDrop: PropTypes.func,
+  draggedItem: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 
 export default ShortcutIcon;
