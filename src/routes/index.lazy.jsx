@@ -63,7 +63,7 @@ function RouteComponent() {
     };
 
     fetchShortcuts();
-  }, []);
+  }, [shortcuts]);
 
   const handleSaveShortcut = async () => {
     await new Promise((resolve) => setTimeout(resolve, 5)); // Wait for 5ms
