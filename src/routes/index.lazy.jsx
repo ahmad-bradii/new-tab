@@ -10,6 +10,7 @@ import ShortcutIcon, { AddShortcutButton } from "../ShortcutIcon";
 import {
   getShortcuts,
   deleteShortcut,
+  updateShortcut,
   updateShortcutsOrder,
   initializeShortcutsOrder,
 } from "../dbHelper";
@@ -18,17 +19,71 @@ import { useState, useEffect } from "react"; // Removed
 import BarMenuSettings from "../BarMenuSettings";
 //
 
+async function getPrayerTimes(state) {
+  try {
+    const date = new Date();
+    const response = await fetch(
+      `https://api.aladhan.com/v1/timingsByAddress/${date.getDay}-${date.getMonth}-${date.getFullYear}?address=${state}`
+    );
+    if (!response.ok) {
+      throw new Error("Network response was not ok");
+    }
+    return await response.json();
+  } catch (e) {
+    console.log("failing fetching data", e);
+  }
+}
+
 export const Route = createLazyFileRoute("/")({
   component: RouteComponent,
 });
 
 function RouteComponent() {
-  // Removed 'async'
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [state, setState] = useState("sfax");
   const [shortcuts, setShortcuts] = useState([]);
   const [horlogeType, sethorlogeType] = useState(0);
   const [showAddShortcut, setShowAddShortcut] = useState(false);
   const [showBarSettings, setShowBarSettings] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const result = await getPrayerTimes(state);
+        setData(result.data);
+        setError(null);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+    console.log("Fetching prayer times for state:", state);
+  }, [state]);
+
+  // Function to reload shortcuts from database
+  const reloadShortcuts = async () => {
+    try {
+      const updatedShortcuts = await getShortcuts();
+      console.log(
+        "Reloaded shortcuts:",
+        updatedShortcuts.map((s) => ({
+          id: s.id,
+          label: s.label,
+          order: s.order,
+        }))
+      );
+      setShortcuts(updatedShortcuts);
+    } catch (error) {
+      console.error("Error reloading shortcuts:", error);
+    }
+  };
   // Removed unused horlogeType state
 
   const changingStatus = () => {
@@ -53,43 +108,46 @@ function RouteComponent() {
       // Initialize order for existing shortcuts that don't have it
       await initializeShortcutsOrder();
 
-      // Get shortcuts (now sorted by order)
-      const shortcuts = await getShortcuts();
-      console.log(
-        "Loaded shortcuts with order:",
-        shortcuts.map((s) => ({ id: s.id, label: s.label, order: s.order }))
-      );
-      setShortcuts(shortcuts);
+      // Load shortcuts using the reload function
+      await reloadShortcuts();
     };
 
     fetchShortcuts();
-  }, [shortcuts]);
+  }, []);
 
   const handleSaveShortcut = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 5)); // Wait for 5ms
-    const shortcuts = await getShortcuts(); // This will now return sorted shortcuts
-    console.log(
-      "Reloaded shortcuts after save:",
-      shortcuts.map((s) => ({ id: s.id, label: s.label, order: s.order }))
-    );
-    setShortcuts(shortcuts);
+    // Wait a bit longer to ensure database write is complete
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Use the reload function
+    await reloadShortcuts();
   };
 
-  const handleDeleteShortcut = (idToDelete) => {
-    setShortcuts((prev) =>
-      prev.filter((shortcut) => shortcut.id != idToDelete)
-    );
-    deleteShortcut(idToDelete);
-    console.log("Shortcut deleted!");
+  const handleDeleteShortcut = async (idToDelete) => {
+    try {
+      await deleteShortcut(idToDelete);
+      console.log("Shortcut deleted!");
+
+      // Reload shortcuts after deletion
+      await reloadShortcuts();
+    } catch (error) {
+      console.error("Error deleting shortcut:", error);
+      alert("Failed to delete shortcut. Please try again.");
+    }
   };
 
-  const handleUpdateShortcut = (updatedShortcut) => {
-    setShortcuts((prevShortcuts) =>
-      prevShortcuts.map((sc) =>
-        sc.id === updatedShortcut.id ? { ...sc, ...updatedShortcut } : sc
-      )
-    );
-    // console.log("updated here");
+  const handleUpdateShortcut = async (updatedShortcut) => {
+    try {
+      // Update the shortcut in the database
+      await updateShortcut(updatedShortcut.id, updatedShortcut);
+      console.log("Shortcut updated in database");
+
+      // Reload shortcuts to ensure consistency
+      await reloadShortcuts();
+    } catch (error) {
+      console.error("Error updating shortcut:", error);
+      alert("Failed to update shortcut. Please try again.");
+    }
   };
 
   // Drag and drop handlers
@@ -133,6 +191,9 @@ function RouteComponent() {
     }
   };
 
+  console.log("data :", data);
+  console.log("state :", state);
+
   return (
     <>
       <div className="routeContainer">
@@ -144,6 +205,7 @@ function RouteComponent() {
             <BarMenuSettings
               action={changingBarStatus}
               changeHorlogeStyle={changeHorloge}
+              setState={setState}
             />
           </div>
         )}
@@ -213,7 +275,12 @@ function RouteComponent() {
             </div>
             <DateComponent />
           </div>
-          <WeatherWithPray />
+          <WeatherWithPray
+            i_state={state}
+            i_error={error}
+            i_loading={loading}
+            i_data={data}
+          />
           {/* <Weather /> */}
         </div>
 

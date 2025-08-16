@@ -60,60 +60,7 @@ const ShortcutIcon = ({
   const isCurrentlyDragged = draggedItem === id;
 
   return (
-    <div
-      draggable
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className={`shortcut_container ${isCurrentlyDragged ? "dragging" : ""} ${isDraggedOver ? "drag-over" : ""}`}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        width: "80px",
-        height: "80px",
-        margin: "10px",
-        textAlign: "center",
-        borderRadius: "14px",
-        position: "relative", // <-- Needed for absolute button
-      }}
-      onMouseEnter={() => setshowlable(false)}
-      onMouseLeave={() => setshowlable(true)}
-    >
-      <button
-        className="delte-edit-tab"
-        style={{
-          position: "absolute",
-          width: "22px",
-          height: "22px",
-          borderRadius: "50%",
-          marginLeft: "60px",
-          alignItems: "center",
-          textAlign: "center",
-          opacity: "30%",
-          border: "0px",
-          display: showlabel ? "none" : "block",
-        }}
-        onClick={changingStatus}
-        tabIndex={-1} // Optional: prevent tab focus if not visible
-        type="button"
-      >
-        {showShortcutlabel ? "✎" : ""}
-      </button>
-      <a
-        href={target}
-        className="shortcut-icon"
-        onClick={handleLinkClick}
-        style={{
-          textDecoration: "none",
-          color: "inherit",
-        }}
-      >
-        <img src={icon} alt={label} className="icon" />
-        <span style={{ fontSize: "0.8rem" }}>{label}</span>
-      </a>
+    <>
       {!showShortcutlabel ? (
         <AddShortcut
           mode={false}
@@ -124,7 +71,31 @@ const ShortcutIcon = ({
           target={target}
         />
       ) : null}
-    </div>
+      <div
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`shortcut_container ${isCurrentlyDragged ? "dragging" : ""} ${isDraggedOver ? "drag-over" : ""}`}
+        onMouseEnter={() => setshowlable(false)}
+        onMouseLeave={() => setshowlable(true)}
+      >
+        <button
+          className={`delte-edit-tab ${showlabel ? "hidden" : "visible"}`}
+          onClick={changingStatus}
+          tabIndex={-1}
+          type="button"
+        >
+          {showShortcutlabel ? "✎" : ""}
+        </button>
+        <a href={target} className="shortcut-icon" onClick={handleLinkClick}>
+          <img src={icon} alt={label} className="icon" />
+          <span>{label}</span>
+        </a>
+      </div>
+    </>
   );
 };
 
@@ -145,34 +116,15 @@ export default ShortcutIcon;
 
 export function AddShortcutButton({ targelShortcut }) {
   return (
-    <div
-      className="shortcut-icon"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        cursor: "pointer",
-        width: "80px",
-        margin: "10px",
-        textAlign: "center",
-      }}
-    >
+    <div className="add-shortcut-container">
       <button
         onClick={targelShortcut}
-        className="shortcut-item add-shortcut-button"
+        className="add-shortcut-button"
         aria-label="Add shortcut"
-        style={{
-          fontSize: "1rem",
-          marginBottom: "5px",
-          width: "50px",
-          height: "50px",
-          borderRadius: "50%",
-          cursor: "pointer",
-        }}
       >
         +
       </button>
-      <span style={{ fontSize: "0.8rem" }}>Add shortcut</span>
+      <span>Add shortcut</span>
     </div>
   );
 }

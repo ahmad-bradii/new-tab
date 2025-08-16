@@ -1,70 +1,218 @@
 import styled from "styled-components";
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { FaSearch } from "react-icons/fa";
 
 const SearchBar = () => {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(-1); // Track active item
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Mock API call (replace with real API)
-  const fetchSuggestions = async (searchTerm) => {
-    let mockResults = [];
-    await fetch(
-      `https://search-api-r2w3.onrender.com/api/suggestions?q=${searchTerm}`
-    )
-      .then((response) => response.json())
-      .then((data) => {
-        mockResults = data;
-      });
-    console.log(mockResults);
-    return mockResults;
-  };
+  // Refs for cleanup and scroll management
+  const abortControllerRef = useRef(null);
+  const debounceTimerRef = useRef(null);
+  const suggestionRefs = useRef([]);
 
-  // Debounced API call
+  // Initialize suggestion refs when suggestions change
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchSuggestions(query).then((results) => {
-        setSuggestions(results);
-        setIsDropdownOpen(results.length > 0);
+    suggestionRefs.current = suggestionRefs.current.slice(
+      0,
+      suggestions.length
+    );
+  }, [suggestions.length]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightedIndex >= 0 && suggestionRefs.current[highlightedIndex]) {
+      suggestionRefs.current[highlightedIndex].scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest",
       });
-    }, 0); // Debounce delay in milliseconds
+    }
+  }, [highlightedIndex]);
 
-    return () => clearTimeout(timer);
-  }, [query]);
+  // Optimized fetch function with abort controller
+  const fetchSuggestions = useCallback(async (searchTerm) => {
+    if (!searchTerm.trim()) {
+      setSuggestions([]);
+      setIsDropdownOpen(false);
+      return;
+    }
 
-  const handleKeyDown = (e) => {
-    if (!isDropdownOpen) return;
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
 
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHighlightedIndex((prevIndex) =>
-        prevIndex < suggestions.length - 1 ? prevIndex + 1 : 0
+    // Create new abort controller
+    abortControllerRef.current = new AbortController();
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await fetch(
+        `https://search-api-r2w3.onrender.com/api/suggestions?q=${encodeURIComponent(searchTerm)}`,
+        {
+          signal: abortControllerRef.current.signal,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
       );
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlightedIndex((prevIndex) =>
-        prevIndex > 0 ? prevIndex - 1 : suggestions.length - 1
-      );
-    } else if (e.key === "Enter") {
-      if (highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
-        const selected = suggestions[highlightedIndex];
-        setQuery(selected);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!abortControllerRef.current.signal.aborted) {
+        setSuggestions(Array.isArray(data) ? data.slice(0, 8) : []); // Limit to 8 suggestions
+        setIsDropdownOpen(Array.isArray(data) && data.length > 0);
+        setHighlightedIndex(-1);
+      }
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.error("Error fetching suggestions:", err);
+        setError("Failed to load suggestions");
+        setSuggestions([]);
         setIsDropdownOpen(false);
-        window.location.href = `https://www.google.com/search?q=${encodeURIComponent(selected)}`;
+      }
+    } finally {
+      if (!abortControllerRef.current?.signal.aborted) {
+        setIsLoading(false);
       }
     }
-  };
+  }, []);
 
-  const searchTarget = () => {
-    const targetElement = document.getElementById("targetInput");
-    const target = targetElement.value;
-    setQuery(target);
+  // Debounced search with proper cleanup
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
 
-    window.location.href = `https://www.google.com/search?q=${encodeURIComponent(target)}`;
-  };
+    debounceTimerRef.current = setTimeout(() => {
+      fetchSuggestions(query);
+    }, 300); // 300ms debounce
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [query, fetchSuggestions]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Optimized keyboard navigation
+  const handleKeyDown = useCallback(
+    (e) => {
+      if (!isDropdownOpen || suggestions.length === 0) return;
+
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          setHighlightedIndex((prevIndex) =>
+            prevIndex < suggestions.length - 1 ? prevIndex + 1 : 0
+          );
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setHighlightedIndex((prevIndex) =>
+            prevIndex > 0 ? prevIndex - 1 : suggestions.length - 1
+          );
+          break;
+        case "Enter":
+          e.preventDefault();
+          if (highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
+            handleSearch(suggestions[highlightedIndex]);
+          } else {
+            handleSearch(query);
+          }
+          break;
+        case "Escape":
+          setIsDropdownOpen(false);
+          setHighlightedIndex(-1);
+          break;
+        default:
+          break;
+      }
+    },
+    [isDropdownOpen, suggestions, highlightedIndex, query]
+  );
+
+  // Optimized search function
+  const handleSearch = useCallback(
+    (searchTerm = query) => {
+      const trimmedTerm = searchTerm.trim();
+      if (!trimmedTerm) return;
+
+      setQuery(trimmedTerm);
+      setIsDropdownOpen(false);
+      setHighlightedIndex(-1);
+
+      // Navigate to search results
+      if (trimmedTerm.startsWith("http") || trimmedTerm.startsWith("https")) {
+        window.location.href = trimmedTerm;
+      } else {
+        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmedTerm)}`;
+        window.location.href = searchUrl;
+      }
+    },
+    [query]
+  );
+
+  // Handle input changes with optimizations
+  const handleInputChange = useCallback(
+    (e) => {
+      const value = e.target.value;
+      setQuery(value);
+      setHighlightedIndex(-1);
+
+      // Clear error when user starts typing
+      if (error) {
+        setError(null);
+      }
+    },
+    [error]
+  );
+
+  // Handle suggestion click
+  const handleSuggestionClick = useCallback(
+    (suggestion) => {
+      handleSearch(suggestion);
+    },
+    [handleSearch]
+  );
+
+  // Handle focus with optimization
+  const handleFocus = useCallback(() => {
+    if (query.trim() && suggestions.length > 0) {
+      setIsDropdownOpen(true);
+    }
+  }, [query, suggestions.length]);
+
+  // Handle blur with delay to allow clicks
+  const handleBlur = useCallback(() => {
+    setTimeout(() => {
+      setIsDropdownOpen(false);
+      setHighlightedIndex(-1);
+    }, 200);
+  }, []);
   return (
     <StyledWrapper>
       <div className="search-container">
@@ -99,59 +247,96 @@ const SearchBar = () => {
             className="search"
             type="text"
             value={query}
-            onChange={(e) => {
-              const value = e.target.value;
-              setQuery(value);
-              fetchSuggestions(value).then((results) => {
-                setSuggestions(results);
-                setIsDropdownOpen(results.length > 0);
-                setHighlightedIndex(-1); // reset highlight on new input
-              });
-            }}
-            onFocus={() => {
-              fetchSuggestions(query).then((results) => {
-                setSuggestions(results);
-                setIsDropdownOpen(results.length > 0);
-              });
-            }}
-            onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
+            onChange={handleInputChange}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                searchTarget();
+                handleSearch();
               } else {
                 handleKeyDown(e);
               }
             }}
             placeholder="Search..."
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck="false"
+            data-form-type="other"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            data-bwignore="true"
+            role="combobox"
+            aria-expanded={isDropdownOpen}
+            aria-autocomplete="list"
+            aria-haspopup="listbox"
           />
           <button
+            type="button"
             style={{
               border: "none",
               background: "transparent",
               width: "50px",
               cursor: "pointer",
+              padding: "8px",
             }}
-            onClick={searchTarget}
+            onClick={() => handleSearch()}
+            aria-label="Search"
           >
             <FaSearch className="text-gray-500" color="grey" size={16} />
           </button>
         </div>
+
+        {/* Loading indicator */}
+        {isLoading && (
+          <div
+            className="loading-indicator"
+            style={{ textAlign: "center", padding: "8px" }}
+          >
+            <span style={{ fontSize: "0.9rem", color: "#666" }}>
+              Loading...
+            </span>
+          </div>
+        )}
+
+        {/* Error message */}
+        {error && (
+          <div
+            className="error-message"
+            style={{ textAlign: "center", padding: "8px" }}
+          >
+            <span style={{ fontSize: "0.9rem", color: "#e53e3e" }}>
+              {error}
+            </span>
+          </div>
+        )}
+
         <div className="suggestionsContainer">
-          {isDropdownOpen && (
-            <ul className="suggestions-dropdown">
+          {isDropdownOpen && suggestions.length > 0 && (
+            <ul
+              className="suggestions-dropdown"
+              role="listbox"
+              aria-label="Search suggestions"
+            >
               {suggestions.map((item, index) => (
                 <li
-                  key={index}
-                  onClick={() => {
-                    setQuery(item);
-                    setIsDropdownOpen(false);
-                    window.location.href = `https://www.google.com/search?q=${encodeURIComponent(item.trim())}`;
-                  }}
+                  key={`${item}-${index}`}
+                  ref={(el) => (suggestionRefs.current[index] = el)}
+                  onClick={() => handleSuggestionClick(item)}
+                  onMouseEnter={() => setHighlightedIndex(index)}
                   style={{
                     backgroundColor:
-                      index === highlightedIndex ? "#eee" : "white",
+                      index === highlightedIndex ? "#f0f8ff" : "white",
                     cursor: "pointer",
+                    padding: "12px 16px",
+                    borderBottom:
+                      index < suggestions.length - 1
+                        ? "1px solid #f0f0f0"
+                        : "none",
+                    transition: "background-color 0.15s ease",
                   }}
+                  role="option"
+                  aria-selected={index === highlightedIndex}
                 >
                   {item}
                 </li>
@@ -166,6 +351,7 @@ const SearchBar = () => {
 
 const StyledWrapper = styled.div`
   .search-container {
+    position: relative;
     box-shadow:
       0 20px 25px -5px rgb(0 0 0 / 0.15),
       0 8px 10px -6px rgb(0 0 0 / 0.25);
@@ -180,10 +366,20 @@ const StyledWrapper = styled.div`
         border-box;
     border: 2px solid transparent;
     border-radius: 18px;
+    transition: all 0.3s ease;
   }
+
+  .search-container:focus-within {
+    box-shadow:
+      0 25px 35px -5px rgb(0 0 0 / 0.2),
+      0 10px 15px -6px rgb(0 0 0 / 0.3);
+    transform: translateY(-2px);
+  }
+
   .input {
     --icon-size: 28px;
     position: relative;
+    display: flex;
     justify-content: center;
     align-items: center;
   }
@@ -193,14 +389,20 @@ const StyledWrapper = styled.div`
     width: var(--icon-size);
     top: 50%;
     left: 1rem;
-    translate: 0 -50%;
+    transform: translateY(-50%);
     overflow: visible;
     color: color-mix(in lch, canvas, canvasText 30%);
+    transition: color 0.2s ease;
   }
 
   .input .svgClass path {
     transform-box: fill-box;
     transform-origin: center;
+    transition: all 0.3s ease;
+  }
+
+  .input:is(:hover, :focus-within) .svgClass {
+    color: color-mix(in lch, canvas, canvasText 50%);
   }
 
   .input:is(:hover, :focus-within) .svgClass path {
@@ -230,72 +432,169 @@ const StyledWrapper = styled.div`
     }
   }
 
-  .search::placeholder {
-    color: color-mix(in lch, canvas, canvasText 30%);
-  }
-
   .search {
     max-width: 800px;
-    padding: 1rem 1rem 1rem calc(1rem + var(--icon-size) + 0.5rem);
+    padding: 1rem 3.5rem 1rem calc(1rem + var(--icon-size) + 0.5rem);
     font-size: 1.025rem;
     field-sizing: content;
     border: 4px solid transparent;
     border-radius: 18px;
     outline: none;
-    /*   background-clip: padding-box, border-box; */
     width: auto;
     min-width: 400px;
+    background: transparent;
+    transition: all 0.2s ease;
+    font-family: inherit;
   }
 
-  .bear-link {
-    color: canvasText;
-    position: fixed;
-    top: 1rem;
-    left: 1rem;
-    width: 48px;
-    aspect-ratio: 1;
-    display: grid;
-    place-items: center;
-    opacity: 0.8;
+  .search::placeholder {
+    color: color-mix(in lch, canvas, canvasText 30%);
+    transition: color 0.2s ease;
   }
 
-  :where(.x-link, .bear-link):is(:hover, :focus-visible) {
-    opacity: 1;
+  .search:focus::placeholder {
+    color: color-mix(in lch, canvas, canvasText 20%);
   }
 
-  .bear-link .svgClass {
-    width: 75%;
+  .search:focus {
+    background: rgba(255, 255, 255, 0.05);
   }
+
+  .suggestionsContainer {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+  }
+
   .suggestions-dropdown {
-    margin-left: 8%;
-
+    margin: 4px 0 0 0;
     min-width: 400px;
     max-width: 800px;
-    max-height: 200px;
+    max-height: 300px;
     overflow-y: auto;
-
-    border: 4px solid transparent;
-    border-radius: 8px;
-
-    font-size: 1.025rem;
-
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow:
+      0 20px 25px -5px rgb(0 0 0 / 0.1),
+      0 10px 10px -5px rgb(0 0 0 / 0.04);
+    font-size: 1rem;
     list-style: none;
     padding: 0;
-    margin-top: -10px;
-    z-index: 1000;
-    justify-content: center;
-    align-items: center;
-    max-height: 150px;
+    backdrop-filter: blur(10px);
+    animation: slideDown 0.2s ease-out;
+    scroll-behavior: smooth;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .suggestions-dropdown li {
-    padding: 10px;
+    padding: 12px 16px;
     cursor: pointer;
+    transition: all 0.15s ease;
+    font-weight: 400;
+    color: #374151;
+    position: relative;
   }
 
   .suggestions-dropdown li:hover,
-  .suggestions-dropdown li.active {
-    background-color: #f0f0f0;
+  .suggestions-dropdown li[aria-selected="true"] {
+    background-color: #f0f8ff;
+    color: #1e40af;
+    transform: translateX(2px);
+  }
+
+  .suggestions-dropdown li[aria-selected="true"]::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: #1e40af;
+    border-radius: 0 2px 2px 0;
+  }
+
+  .suggestions-dropdown li:first-child {
+    border-radius: 12px 12px 0 0;
+  }
+
+  .suggestions-dropdown li:last-child {
+    border-radius: 0 0 12px 12px;
+  }
+
+  .suggestions-dropdown li:only-child {
+    border-radius: 12px;
+  }
+
+  .loading-indicator,
+  .error-message {
+    margin: 4px 0 0 0;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .loading-indicator {
+    background: transparent;
+    color: #576170ff;
+  }
+
+  .error-message {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Scrollbar styling for suggestions */
+  .suggestions-dropdown::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .suggestions-dropdown::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+  }
+
+  .suggestions-dropdown::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+  }
+
+  .suggestions-dropdown::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .search {
+      min-width: 280px;
+      font-size: 1rem;
+    }
+
+    .suggestions-dropdown {
+      min-width: 280px;
+    }
   }
 `;
 
