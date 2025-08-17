@@ -1,0 +1,229 @@
+/* Adaptive Background Theme CSS */
+:root {
+  /* Default values */
+  --bg-dominant-color: #ffffff;
+  --bg-accent-color: #667eea;
+  --bg-text-color: #333333;
+  --bg-is-dark: 0;
+  --bg-brightness: 128;
+  --bg-overlay: rgba(255, 255, 255, 0.2);
+}
+
+/* Adaptive card backgrounds */
+/* .card {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--bg-dominant-color) 60%, white 40%),
+    color-mix(in srgb, var(--bg-dominant-color) 40%, white 60%)
+  ) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid
+    color-mix(in srgb, var(--bg-dominant-color) 30%, transparent 70%);
+  box-shadow:
+    0 8px 32px color-mix(in srgb, var(--bg-dominant-color) 20%, transparent 80%),
+    inset 0 1px 0 color-mix(in srgb, white 40%, transparent 60%);
+} */
+
+/* Adaptive text colors */
+.card,
+.card * {
+  color: var(--bg-text-color) !important;
+}
+
+/* Temperature and main text */
+.temperature,
+.time,
+.date {
+  color: var(--bg-text-color) !important;
+  text-shadow: 0 2px 4px
+    color-mix(in srgb, var(--bg-dominant-color) 50%, black 0%);
+}
+
+/* Location and smaller text */
+.location,
+.day,
+.hour-item span {
+  color: color-mix(
+    in srgb,
+    var(--bg-text-color) 80%,
+    var(--bg-dominant-color) 20%
+  ) !important;
+}
+
+/* Shortcut containers with adaptive background */
+.shortcut_container,
+.weather-card,
+.date-card {
+  background: color-mix(
+    in srgb,
+    var(--bg-dominant-color) 20%,
+    transparent 80%
+  ) !important;
+  border: 1px solid
+    color-mix(in srgb, var(--bg-dominant-color) 30%, transparent 70%) !important;
+  backdrop-filter: blur(8px);
+}
+
+.shortcut_container:hover {
+  background: color-mix(
+    in srgb,
+    var(--bg-dominant-color) 35%,
+    transparent 65%
+  ) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--bg-accent-color) 60%,
+    transparent 40%
+  ) !important;
+  box-shadow: 0 8px 25px
+    color-mix(in srgb, var(--bg-accent-color) 30%, transparent 70%) !important;
+}
+
+/* Shortcut text */
+.shortcut_container span {
+  color: var(--bg-text-color) !important;
+  text-shadow: 0 1px 3px
+    color-mix(in srgb, var(--bg-dominant-color) 60%, black 30%);
+}
+
+/* Search bar adaptive styling */
+.search-container {
+  background: color-mix(
+    in srgb,
+    var(--bg-dominant-color) 25%,
+    white 75%
+  ) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--bg-accent-color) 40%,
+    transparent 60%
+  ) !important;
+  backdrop-filter: blur(12px);
+}
+
+.search {
+  color: var(--bg-text-color) !important;
+}
+
+.search::placeholder {
+  color: color-mix(
+    in srgb,
+    var(--bg-text-color) 60%,
+    transparent 40%
+  ) !important;
+}
+
+/* Weather card adaptive styling */
+
+/* Count down and prayer times */
+.count-down {
+  color: var(--bg-text-color) !important;
+}
+
+/* Add shortcut button adaptive */
+.add-shortcut-button {
+  background: linear-gradient(
+    135deg,
+    var(--bg-accent-color),
+    color-mix(in srgb, var(--bg-accent-color) 80%, var(--bg-dominant-color) 20%)
+  ) !important;
+  color: white !important;
+}
+
+.add-shortcut-container span {
+  color: var(--bg-text-color) !important;
+  text-shadow: 0 1px 3px
+    color-mix(in srgb, var(--bg-dominant-color) 60%, black 40%);
+  font-size: 0.75rem;
+  font-weight: 500;
+
+  transition: color 0.2s ease-in-out;
+}
+
+.add-shortcut-container:hover span {
+  color: var(--bg-text-color) !important;
+}
+
+/* Hourly forecast items */
+/* .hour-item {
+  background: color-mix(in srgb, var(--bg-dominant-color) 20%, transparent 80%);
+  border-radius: 8px;
+  padding: 8px 4px;
+  backdrop-filter: blur(6px);
+} */
+
+/* Icons adaptive coloring */
+.hour-item i.fa-sun {
+  color: color-mix(in srgb, #ffcc00 70%, var(--bg-accent-color) 30%) !important;
+}
+
+.hour-item i.fa-moon {
+  color: color-mix(in srgb, #9f94b0 70%, var(--bg-accent-color) 30%) !important;
+}
+
+/* Dark mode adaptations */
+/* body:has([style*="--bg-is-dark: 1"]) .card {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--bg-dominant-color) 40%, black 60%),
+    color-mix(in srgb, var(--bg-dominant-color) 20%, black 80%)
+  ) !important;
+} */
+
+body:has([style*="--bg-is-dark: 1"]) .shortcut_container {
+  background: color-mix(
+    in srgb,
+    var(--bg-dominant-color) 15%,
+    black 85%
+  ) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--bg-dominant-color) 40%,
+    transparent 60%
+  ) !important;
+}
+
+body:has([style*="--bg-is-dark: 1"]) .search-container {
+  background: color-mix(
+    in srgb,
+    var(--bg-dominant-color) 20%,
+    black 80%
+  ) !important;
+}
+
+/* Adaptive overlay for better readability */
+.routeContainer::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-overlay);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Smooth transitions for theme changes */
+.card,
+.shortcut_container,
+.search-container,
+.weather-card,
+.count-down,
+.hour-item {
+  transition: all 0.5s ease-in-out !important;
+}
+
+/* Enhanced text readability */
+.time,
+.temperature,
+.date,
+.location {
+  text-shadow:
+    0 2px 4px color-mix(in srgb, var(--bg-dominant-color) 50%, black 10%),
+    0 0 8px color-mix(in srgb, var(--bg-dominant-color) 30%, black 20%) !important;
+}
+
+.day :first-child {
+  color: rgb(9, 110, 26) !important;
+}

@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import styled from "styled-components";
-
+import { HiMiniArrowLongRight } from "react-icons/hi2";
+import { GrClearOption } from "react-icons/gr";
 // Styled Components
 const SettingsContainer = styled.div`
   background: ${(props) =>
     props.darkMode
       ? "linear-gradient(135deg, #232526 0%, #414345 100%)"
-      : "rgb(255, 255, 255)"};
+      : "rgba(255, 255, 255, 1)"};
   color: ${(props) => (props.darkMode ? "#fff" : "#222")};
   padding: 32px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
@@ -18,41 +19,27 @@ const SettingsContainer = styled.div`
 
 const SettingsHeader = styled.div`
   display: flex;
-  align-items: center;
+  align-items: left;
+  justify-content: left;
+  font-size: 22px;
+  background: rgba(19, 63, 25, 1);
   gap: 12px;
   margin-bottom: 25px;
-  font-size: 20px;
-  font-weight: 600;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 `;
-
-const SettingsSection = styled.fieldset`
-  border: 2px solid
-    ${(props) => (props.darkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)")};
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-  background: ${(props) =>
-    props.darkMode ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)"};
-  transition: all 0.3s ease;
-
-  &:hover {
-    border-color: ${(props) =>
-      props.darkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)"};
-    transform: translateY(-2px);
-  }
-`;
-
-const SectionTitle = styled.legend`
-  font-weight: 600;
-  font-size: 16px;
-  padding: 0 12px;
-  color: ${(props) => (props.darkMode ? "#fff" : "#333")};
-  background: ${(props) => (props.darkMode ? "#232526" : "#fff")};
-  border-radius: 6px;
+const TitleHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 27px;
+  background: rgba(8, 122, 24, 1);
+  gap: 12px;
+  margin-bottom: 25px;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 `;
 
 const ToggleContainer = styled.div`
@@ -107,28 +94,6 @@ const SelectLabel = styled.label`
   color: ${(props) => (props.darkMode ? "#e8e8e8" : "#333")};
 `;
 
-const StyledSelect = styled.select`
-  width: 100%;
-  padding: 12px 15px;
-  border: 2px solid ${(props) => (props.darkMode ? "#555" : "#ddd")};
-  border-radius: 8px;
-  background: ${(props) => (props.darkMode ? "#333" : "#fff")};
-  color: ${(props) => (props.darkMode ? "#fff" : "#333")};
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-
-  &:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-  }
-
-  &:hover {
-    border-color: ${(props) => (props.darkMode ? "#666" : "#bbb")};
-  }
-`;
-
 const ImageSection = styled.div`
   margin-bottom: 16px;
 `;
@@ -169,8 +134,8 @@ const FileInput = styled.input`
 const FileInputLabel = styled.label`
   display: inline-block;
   padding: 10px 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: transparent;
+  color: ${(props) => (props.darkMode ? "#fff" : "#333")};
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
@@ -186,8 +151,8 @@ const FileInputLabel = styled.label`
 
 const ActionButton = styled.button`
   width: 100%;
-  background: linear-gradient(90deg, #43cea2 0%, #185a9d 100%);
-  color: #fff;
+  background: transparent;
+
   border: none;
   border-radius: 8px;
   padding: ${(props) => (props.compact ? "8px 0" : "14px 0")};
@@ -213,7 +178,15 @@ const ActionButton = styled.button`
   }
 `;
 
-function BarMenuSettings({ action, changeHorlogeStyle, setState }) {
+function BarMenuSettings({
+  action,
+  changeHorlogeStyle,
+  setState,
+  state,
+  backgroundImage,
+  setBackgroundImage,
+  backgroundTheme,
+}) {
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem("darkMode");
     return saved ? JSON.parse(saved) : false;
@@ -224,12 +197,8 @@ function BarMenuSettings({ action, changeHorlogeStyle, setState }) {
     return saved ? JSON.parse(saved) : false;
   });
 
-  const [image, setImage] = useState(() => {
-    const saved = localStorage.getItem("backgroundImage");
-    return saved || "./44.jpg";
-  });
-
   const [notification, setNotification] = useState("");
+  const [newState, setNewState] = useState(state);
 
   // Save to localStorage whenever settings change
   useEffect(() => {
@@ -241,12 +210,12 @@ function BarMenuSettings({ action, changeHorlogeStyle, setState }) {
   }, [compactMode]);
 
   useEffect(() => {
-    localStorage.setItem("selectedCountry", country);
-  }, [country]);
+    localStorage.setItem("selectedCountry", state);
+  }, [state]);
 
   useEffect(() => {
-    localStorage.setItem("backgroundImage", image);
-  }, [image]);
+    localStorage.setItem("backgroundImage", backgroundImage);
+  }, [backgroundImage]);
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -259,7 +228,7 @@ function BarMenuSettings({ action, changeHorlogeStyle, setState }) {
 
       const reader = new FileReader();
       reader.onload = (event) => {
-        setImage(event.target.result);
+        setBackgroundImage(event.target.result);
         showNotification("Background image updated!", "success");
       };
       reader.readAsDataURL(file);
@@ -267,7 +236,7 @@ function BarMenuSettings({ action, changeHorlogeStyle, setState }) {
   };
 
   const removeImage = () => {
-    setImage("./44.jpg"); // Reset to default
+    setBackgroundImage("./11.jpg"); // Reset to default background
     showNotification("Background reset to default", "success");
   };
 
@@ -277,32 +246,64 @@ function BarMenuSettings({ action, changeHorlogeStyle, setState }) {
   };
 
   const handleSaveSettings = () => {
+    if (newState) setState(newState);
     showNotification("All settings saved successfully!", "success");
   };
 
   return (
-    <SettingsContainer darkMode={darkMode}>
-      <SettingsHeader>⚙️ Settings Panel</SettingsHeader>
-
-      {notification && (
-        <div
-          style={{
-            padding: "12px",
-            borderRadius: "8px",
-            marginBottom: "16px",
-            background: notification.type === "success" ? "#d4edda" : "#f8d7da",
-            color: notification.type === "success" ? "#155724" : "#721c24",
-            border: `1px solid ${notification.type === "success" ? "#c3e6cb" : "#f5c6cb"}`,
-            fontSize: "14px",
-            fontWeight: "500",
-          }}
-        >
-          {notification.message}
+    <div style={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
+      <SettingsContainer
+        darkMode={darkMode}
+        style={{ width: "400px", minWidth: "320px", position: "relative" }}
+      >
+        {/* Top-right ActionButton */}
+        <div style={{ position: "absolute", top: 16, right: 16, zIndex: 2 }}>
+          <ActionButton
+            compact={compactMode}
+            onClick={action}
+            style={{
+              background: "transparent",
+              marginBottom: 0,
+              width: "40px",
+              height: "40px",
+              color: darkMode ? "#fff" : "#333",
+              fontSize: "22px",
+              padding: 7,
+              minWidth: 0,
+              justifyContent: "center",
+            }}
+          >
+            <HiMiniArrowLongRight />
+          </ActionButton>
         </div>
-      )}
+        <TitleHeader>Settings Panel</TitleHeader>
 
-      <SettingsSection darkMode={darkMode}>
-        <SectionTitle darkMode={darkMode}>🎨 Appearance</SectionTitle>
+        {notification && (
+          <div
+            style={{
+              padding: "12px",
+              borderRadius: "8px",
+              marginBottom: "16px",
+              background:
+                notification.type === "success" ? "#d4edda" : "#f8d7da",
+              color: notification.type === "success" ? "#155724" : "#721c24",
+              border: `1px solid ${notification.type === "success" ? "#c3e6cb" : "#f5c6cb"}`,
+              fontSize: "14px",
+              fontWeight: "500",
+            }}
+          >
+            {notification.message}
+          </div>
+        )}
+
+        <ActionButton compact={compactMode} onClick={changeHorlogeStyle}>
+          <SelectLabel darkMode={darkMode}>🕐 Change Horloge Style</SelectLabel>
+        </ActionButton>
+        <ActionButton compact={compactMode} onClick={handleSaveSettings}>
+          <SelectLabel darkMode={darkMode}>💾 Save All Settings</SelectLabel>
+        </ActionButton>
+
+        <SettingsHeader>Appearance</SettingsHeader>
 
         <ToggleContainer>
           <ToggleLabel>🌙 Dark Mode</ToggleLabel>
@@ -313,42 +314,89 @@ function BarMenuSettings({ action, changeHorlogeStyle, setState }) {
           />
         </ToggleContainer>
 
-        <ToggleContainer>
+        {/* <ToggleContainer>
           <ToggleLabel>📱 Compact Mode</ToggleLabel>
           <Toggle
             checked={compactMode}
             darkMode={darkMode}
             onClick={() => setCompactMode(!compactMode)}
           />
-        </ToggleContainer>
-      </SettingsSection>
+        </ToggleContainer> */}
 
-      <SettingsSection darkMode={darkMode}>
-        <SectionTitle darkMode={darkMode}>🌍 Location</SectionTitle>
+        <SettingsHeader>Location</SettingsHeader>
 
         <SelectContainer>
           <SelectLabel darkMode={darkMode}>Select Your City</SelectLabel>
-          <StyledSelect
-            darkMode={darkMode}
-            value={country}
-            onChange={(e) => setState(e.target.value)}
-          >
-            <option value="Tunis">Tunis</option>
-            <option value="Sfax">Sfax</option>
-            <option value="Sousse">Sousse</option>
-            <option value="Monastir">Monastir</option>
-          </StyledSelect>
+          <input
+            type="text"
+            placeholder="Enter your city"
+            onChange={(e) => setNewState(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: "8px",
+              border: "1px solid #ccc",
+            }}
+          />
         </SelectContainer>
-      </SettingsSection>
+        <SettingsHeader>Background & Theme</SettingsHeader>
 
-      <SettingsSection darkMode={darkMode}>
-        <SectionTitle darkMode={darkMode}>🖼️ Background</SectionTitle>
+        {backgroundTheme && (
+          <div
+            style={{
+              padding: "12px",
+              marginBottom: "16px",
+              borderRadius: "8px",
+              background: `linear-gradient(135deg, ${backgroundTheme.dominantColor}20, ${backgroundTheme.accentColor}10)`,
+              border: `1px solid ${backgroundTheme.dominantColor}30`,
+            }}
+          >
+            <div
+              style={{
+                fontSize: "14px",
+                fontWeight: "500",
+                marginBottom: "8px",
+                color: darkMode ? "#fff" : "#333",
+              }}
+            >
+              🎨 Current Theme Analysis
+            </div>
+            <div
+              style={{
+                fontSize: "12px",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "4px",
+                color: darkMode ? "#e8e8e8" : "#666",
+              }}
+            >
+              <span>
+                Brightness:{" "}
+                {backgroundTheme.brightness > 128 ? "☀️ Light" : "🌙 Dark"}
+              </span>
+              <span>
+                Dominant:{" "}
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: "12px",
+                    height: "12px",
+                    backgroundColor: backgroundTheme.dominantColor,
+                    borderRadius: "2px",
+                    marginLeft: "4px",
+                    border: "1px solid #ccc",
+                  }}
+                ></span>
+              </span>
+            </div>
+          </div>
+        )}
 
         <ImageSection>
-          <ImagePreview darkMode={darkMode} image={image}>
+          <ImagePreview darkMode={darkMode} image={backgroundImage}>
             <ImagePlaceholder
               darkMode={darkMode}
-              hasImage={image && image !== "./44.jpg"}
+              hasImage={backgroundImage && backgroundImage !== "./11.jpg"}
             >
               📸 Click to upload background image
             </ImagePlaceholder>
@@ -356,7 +404,9 @@ function BarMenuSettings({ action, changeHorlogeStyle, setState }) {
 
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <FileInputLabel htmlFor="imageUpload">
-              📁 Upload Image
+              <ToggleLabel style={{ color: darkMode ? "#fff" : "#333" }}>
+                📁 Upload Image
+              </ToggleLabel>
             </FileInputLabel>
             <FileInput
               id="imageUpload"
@@ -365,7 +415,7 @@ function BarMenuSettings({ action, changeHorlogeStyle, setState }) {
               onChange={handleImageUpload}
             />
 
-            {image && image !== "./44.jpg" && (
+            {backgroundImage && backgroundImage !== "./11.jpg" && (
               <ActionButton
                 compact
                 onClick={removeImage}
@@ -377,32 +427,13 @@ function BarMenuSettings({ action, changeHorlogeStyle, setState }) {
                   margin: 0,
                 }}
               >
-                🗑️ Reset
+                <GrClearOption /> Reset
               </ActionButton>
             )}
           </div>
         </ImageSection>
-      </SettingsSection>
-
-      <ActionButton compact={compactMode} onClick={action}>
-        🕐 Change Horloge Style
-      </ActionButton>
-
-      <ActionButton compact={compactMode} onClick={handleSaveSettings}>
-        💾 Save All Settings
-      </ActionButton>
-
-      <ActionButton
-        compact={compactMode}
-        onClick={action}
-        style={{
-          background: "linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)",
-          marginBottom: 0,
-        }}
-      >
-        ❌ Close Settings
-      </ActionButton>
-    </SettingsContainer>
+      </SettingsContainer>
+    </div>
   );
 }
 

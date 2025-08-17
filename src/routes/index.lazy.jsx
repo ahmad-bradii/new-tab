@@ -23,7 +23,7 @@ async function getPrayerTimes(state) {
   try {
     const date = new Date();
     const response = await fetch(
-      `https://api.aladhan.com/v1/timingsByAddress/${date.getDay}-${date.getMonth}-${date.getFullYear}?address=${state}`
+      `https://api.aladhan.com/v1/timingsByAddress/${date.getDay}-${date.getMonth}-${date.getFullYear}?address=tunisia-${state}`
     );
     if (!response.ok) {
       throw new Error("Network response was not ok");
@@ -48,6 +48,147 @@ function RouteComponent() {
   const [showAddShortcut, setShowAddShortcut] = useState(false);
   const [showBarSettings, setShowBarSettings] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
+  const [backgroundImage, setBackgroundImage] = useState(() => {
+    const saved = localStorage.getItem("backgroundImage");
+    return saved || "./11.jpg";
+  });
+  const [backgroundTheme, setBackgroundTheme] = useState(() => {
+    const saved = localStorage.getItem("backgroundTheme");
+    return saved
+      ? JSON.parse(saved)
+      : {
+          isDark: false,
+          dominantColor: "#ffffff",
+          accentColor: "#667eea",
+          textColor: "#333333",
+        };
+  });
+
+  // Function to analyze image and extract colors
+  const analyzeImage = (imageUrl) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        ctx.drawImage(img, 0, 0);
+
+        try {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+
+          let r = 0,
+            g = 0,
+            b = 0;
+          let pixelCount = 0;
+
+          // Sample every 10th pixel for performance
+          for (let i = 0; i < data.length; i += 40) {
+            r += data[i];
+            g += data[i + 1];
+            b += data[i + 2];
+            pixelCount++;
+          }
+
+          r = Math.floor(r / pixelCount);
+          g = Math.floor(g / pixelCount);
+          b = Math.floor(b / pixelCount);
+
+          // Calculate brightness
+          const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+          const isDark = brightness < 128;
+
+          // Generate complementary colors
+          const dominantColor = `rgb(${r}, ${g}, ${b})`;
+          const accentColor = isDark
+            ? `rgb(${Math.min(255, r + 50)}, ${Math.min(255, g + 50)}, ${Math.min(255, b + 50)})`
+            : `rgb(${Math.max(0, r - 50)}, ${Math.max(0, g - 50)}, ${Math.max(0, b - 50)})`;
+          const textColor = isDark ? "#ffffff" : "#333333";
+
+          const theme = {
+            isDark,
+            dominantColor,
+            accentColor,
+            textColor,
+            brightness,
+          };
+
+          resolve(theme);
+        } catch (error) {
+          console.log("Error analyzing image:", error);
+          resolve({
+            isDark: false,
+            dominantColor: "#ffffff",
+            accentColor: "#667eea",
+            textColor: "#333333",
+            brightness: 128,
+          });
+        }
+      };
+
+      img.onerror = () => {
+        resolve({
+          isDark: false,
+          dominantColor: "#ffffff",
+          accentColor: "#667eea",
+          textColor: "#333333",
+          brightness: 128,
+        });
+      };
+
+      img.src = imageUrl;
+    });
+  };
+
+  // Apply background image and analyze colors
+  useEffect(() => {
+    if (backgroundImage) {
+      document.body.style.backgroundImage = `url(${backgroundImage})`;
+      document.body.style.backgroundSize = "cover";
+      document.body.style.backgroundRepeat = "no-repeat";
+      document.body.style.backgroundAttachment = "fixed";
+      document.body.style.backgroundPosition = "center";
+
+      // Analyze image for color theming
+      analyzeImage(backgroundImage).then((theme) => {
+        setBackgroundTheme(theme);
+        localStorage.setItem("backgroundTheme", JSON.stringify(theme));
+
+        // Apply CSS custom properties for dynamic theming
+        document.documentElement.style.setProperty(
+          "--bg-dominant-color",
+          theme.dominantColor
+        );
+        document.documentElement.style.setProperty(
+          "--bg-accent-color",
+          theme.accentColor
+        );
+        document.documentElement.style.setProperty(
+          "--bg-text-color",
+          theme.textColor
+        );
+        document.documentElement.style.setProperty(
+          "--bg-is-dark",
+          theme.isDark ? "1" : "0"
+        );
+        document.documentElement.style.setProperty(
+          "--bg-brightness",
+          theme.brightness
+        );
+
+        // Apply adaptive overlay
+        const overlay = theme.isDark
+          ? "rgba(0, 0, 0, 0.3)"
+          : "rgba(255, 255, 255, 0.2)";
+        document.documentElement.style.setProperty("--bg-overlay", overlay);
+      });
+    }
+  }, [backgroundImage]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -206,6 +347,10 @@ function RouteComponent() {
               action={changingBarStatus}
               changeHorlogeStyle={changeHorloge}
               setState={setState}
+              state={state}
+              backgroundImage={backgroundImage}
+              setBackgroundImage={setBackgroundImage}
+              backgroundTheme={backgroundTheme}
             />
           </div>
         )}

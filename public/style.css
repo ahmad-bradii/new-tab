@@ -210,7 +210,7 @@ body {
   transform: scale(0.95);
 }
 
-.add-shortcut-container span {
+/* .add-shortcut-container span {
   font-size: 0.75rem;
   font-weight: 500;
   color: #4a5568;
@@ -220,7 +220,7 @@ body {
 
 .add-shortcut-container:hover span {
   color: #2d3748;
-}
+} */
 
 .routeContainer {
   display: grid;

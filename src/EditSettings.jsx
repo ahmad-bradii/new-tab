@@ -1,19 +1,21 @@
+import { HiOutlineCog8Tooth } from "react-icons/hi2";
+
 function EditSettings({ action }) {
   return (
     <div className="setting_button" style={{ textAlign: "center" }}>
       <button
         onClick={action}
         style={{
-          backgroundColor: "#184113",
+          backgroundColor: "transparent",
           color: "#fff",
           border: "none",
           borderRadius: "4px",
           cursor: "pointer",
-          fontSize: "16px",
+          fontSize: "20px",
           boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
         }}
       >
-        setting
+        <HiOutlineCog8Tooth />
       </button>
     </div>
   );
