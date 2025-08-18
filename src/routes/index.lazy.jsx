@@ -30,7 +30,7 @@ async function getPrayerTimes(state) {
     }
     return await response.json();
   } catch (e) {
-    console.log("failing fetching data", e);
+    //console.log("failing fetching data", e);
   }
 }
 
@@ -120,7 +120,7 @@ function RouteComponent() {
 
           resolve(theme);
         } catch (error) {
-          console.log("Error analyzing image:", error);
+          //console.log("Error analyzing image:", error);
           resolve({
             isDark: false,
             dominantColor: "#ffffff",
@@ -205,21 +205,21 @@ function RouteComponent() {
     };
 
     fetchData();
-    console.log("Fetching prayer times for state:", state);
+    //console.log("Fetching prayer times for state:", state);
   }, [state]);
 
   // Function to reload shortcuts from database
   const reloadShortcuts = async () => {
     try {
       const updatedShortcuts = await getShortcuts();
-      console.log(
-        "Reloaded shortcuts:",
-        updatedShortcuts.map((s) => ({
-          id: s.id,
-          label: s.label,
-          order: s.order,
-        }))
-      );
+      // console.log(
+      //   "Reloaded shortcuts:",
+      //   updatedShortcuts.map((s) => ({
+      //     id: s.id,
+      //     label: s.label,
+      //     order: s.order,
+      //   }))
+      // );
       setShortcuts(updatedShortcuts);
     } catch (error) {
       console.error("Error reloading shortcuts:", error);
@@ -232,11 +232,11 @@ function RouteComponent() {
   };
   const changingBarStatus = () => {
     setShowBarSettings((e) => !e);
-    // console.log(showBarSettings, "good?");
+    // //console.log(showBarSettings, "good?");
   };
 
   const changeHorloge = () => {
-    // console.log(horlogeType);
+    // //console.log(horlogeType);
     sethorlogeType(horlogeType + 1);
     if (horlogeType > 1) {
       sethorlogeType(0);
@@ -267,7 +267,7 @@ function RouteComponent() {
   const handleDeleteShortcut = async (idToDelete) => {
     try {
       await deleteShortcut(idToDelete);
-      console.log("Shortcut deleted!");
+      //console.log("Shortcut deleted!");
 
       // Reload shortcuts after deletion
       await reloadShortcuts();
@@ -281,7 +281,7 @@ function RouteComponent() {
     try {
       // Update the shortcut in the database
       await updateShortcut(updatedShortcut.id, updatedShortcut);
-      console.log("Shortcut updated in database");
+      //console.log("Shortcut updated in database");
 
       // Reload shortcuts to ensure consistency
       await reloadShortcuts();
@@ -313,10 +313,10 @@ function RouteComponent() {
     const [draggedShortcut] = newShortcuts.splice(draggedIndex, 1);
     newShortcuts.splice(targetIndex, 0, draggedShortcut);
 
-    console.log(
-      "New order after drop:",
-      newShortcuts.map((s) => ({ id: s.id, label: s.label }))
-    );
+    // console.log(
+    //   "New order after drop:",
+    //   newShortcuts.map((s) => ({ id: s.id, label: s.label }))
+    // );
 
     // Update state
     setShortcuts(newShortcuts);
@@ -324,7 +324,7 @@ function RouteComponent() {
     // Update database
     try {
       await updateShortcutsOrder(newShortcuts);
-      console.log("Successfully updated order in database");
+      //console.log("Successfully updated order in database");
     } catch (error) {
       console.error("Failed to update shortcuts order:", error);
       // Revert state on error
@@ -332,8 +332,8 @@ function RouteComponent() {
     }
   };
 
-  console.log("data :", data);
-  console.log("state :", state);
+  //console.log("data :", data);
+  //console.log("state :", state);
 
   return (
     <>

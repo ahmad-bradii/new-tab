@@ -11,8 +11,8 @@ const AddShortcut = ({
 }) => {
   const fetchingData = (e) => {
     e.preventDefault();
-    console.log("hello");
-    console.log(target);
+    //console.log("hello");
+    //console.log(target);
     const form = e.target;
     if (!(form instanceof HTMLFormElement)) {
       console.error("Expected form element.");
@@ -33,7 +33,7 @@ const AddShortcut = ({
       domain = new URL(newUrl).hostname;
     } catch (err) {
       alert("Invalid URL");
-      console.log(err);
+      //console.log(err);
 
       return null;
     }
@@ -43,17 +43,18 @@ const AddShortcut = ({
 
   const handleCreateShortcut = async (e) => {
     const data = fetchingData(e);
+    //console.log("domain: ", data.url);
     if (!data) return;
     const newShortcut = {
       id: Date.now(),
       label: data.name,
-      icon: `https://www.google.com/s2/favicons?domain=${data.domain}&sz=128`,
+      icon: `https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${data.url}/&size=128`,
       target: data.url,
     };
 
     try {
       await addShortcut(newShortcut);
-      console.log("Shortcut added successfully!");
+      //console.log("Shortcut added successfully!");
       if (handleSaveShortcut) await handleSaveShortcut();
       changingStatus(); // Close the add shortcut form
     } catch (error) {
@@ -74,7 +75,7 @@ const AddShortcut = ({
     try {
       await updateShortcut(id, newShortcut);
       onUpdate({ ...newShortcut, id });
-      console.log("Shortcut updated!");
+      //console.log("Shortcut updated!");
       changingStatus(); // Close the edit form
     } catch (error) {
       console.error("Error updating shortcut:", error);

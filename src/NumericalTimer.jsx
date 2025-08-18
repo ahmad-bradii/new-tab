@@ -10,7 +10,7 @@ const NumericalTimer = () => {
       const newDate = new Date();
       setMinute(newDate.getMinutes());
       setHour(newDate.getHours());
-      console.log("newDate");
+      ////console.log("newDate");
     }, 1000);
 
     return () => clearInterval(interval);

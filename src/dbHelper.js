@@ -41,7 +41,7 @@ export const updateShortcut = async (id, updatedShortcut) => {
 
   const currentShortcut = await db.get("shortcuts", id);
   if (!currentShortcut) {
-    console.log("shortcut not found!!");
+    //console.log("shortcut not found!!");
     return null;
   }
 
