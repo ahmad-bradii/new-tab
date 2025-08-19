@@ -1,6 +1,7 @@
 import PropTypes from "prop-types";
 import AddShortcut from "./AddShortcuts";
-import { useState } from "react";
+import { useState, memo } from "react";
+import OptimizedImage from "./components/OptimizedImage";
 
 const ShortcutIcon = ({
   icon,
@@ -91,20 +92,14 @@ const ShortcutIcon = ({
           {showShortcutlabel ? "✎" : ""}
         </button>
         <a href={target} className="shortcut-icon" onClick={handleLinkClick}>
-          <img
+          <OptimizedImage
             src={icon}
             alt={label}
             className="icon"
-            width="40"
-            height="40"
-            loading="lazy"
-            onError={(e) => {
-              // Fallback to a placeholder if image fails to load
-              e.target.style.backgroundColor = "#f0f0f0";
-              e.target.style.display = "flex";
-              e.target.style.alignItems = "center";
-              e.target.style.justifyContent = "center";
-              e.target.textContent = label.charAt(0).toUpperCase();
+            width={40}
+            height={40}
+            onError={() => {
+              // Fallback handled by OptimizedImage component
             }}
           />
           <span>{label}</span>
@@ -127,7 +122,7 @@ ShortcutIcon.propTypes = {
   draggedItem: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 
-export default ShortcutIcon;
+export default memo(ShortcutIcon);
 
 export function AddShortcutButton({ targelShortcut }) {
   return (

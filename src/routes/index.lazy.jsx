@@ -4,6 +4,7 @@ import DateComponent from "../DateComponent";
 import { NumericalTimer } from "../NumericalTimer";
 import WeatherWithPray from "../WeatherWithPray";
 // import Weather from "../Weather";
+import { analyzeImage } from "../utils/analyze";
 import SearchBar from "../SearchBar";
 import Header from "../Header";
 import ShortcutIcon, { AddShortcutButton } from "../ShortcutIcon";
@@ -15,8 +16,9 @@ import {
   initializeShortcutsOrder,
 } from "../dbHelper";
 import AddShortcut from "../AddShortcuts";
-import { useState, useEffect } from "react"; // Removed
+import { useState, useEffect, useMemo, useCallback } from "react";
 import BarMenuSettings from "../BarMenuSettings";
+import perfMonitor from "../utils/performanceMonitor";
 //
 
 async function getPrayerTimes(state) {
@@ -66,85 +68,6 @@ function RouteComponent() {
   });
 
   // Function to analyze image and extract colors
-  const analyzeImage = (imageUrl) => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        canvas.width = img.width;
-        canvas.height = img.height;
-
-        ctx.drawImage(img, 0, 0);
-
-        try {
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imageData.data;
-
-          let r = 0,
-            g = 0,
-            b = 0;
-          let pixelCount = 0;
-
-          // Sample every 10th pixel for performance
-          for (let i = 0; i < data.length; i += 40) {
-            r += data[i];
-            g += data[i + 1];
-            b += data[i + 2];
-            pixelCount++;
-          }
-
-          r = Math.floor(r / pixelCount);
-          g = Math.floor(g / pixelCount);
-          b = Math.floor(b / pixelCount);
-
-          // Calculate brightness
-          const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-          const isDark = brightness < 128;
-
-          // Generate complementary colors
-          const dominantColor = `rgb(${r}, ${g}, ${b})`;
-          const accentColor = isDark
-            ? `rgb(${Math.min(255, r + 50)}, ${Math.min(255, g + 50)}, ${Math.min(255, b + 50)})`
-            : `rgb(${Math.max(0, r - 50)}, ${Math.max(0, g - 50)}, ${Math.max(0, b - 50)})`;
-          const textColor = isDark ? "#ffffff" : "#333333";
-
-          const theme = {
-            isDark,
-            dominantColor,
-            accentColor,
-            textColor,
-            brightness,
-          };
-
-          resolve(theme);
-        } catch (error) {
-          console.log("Error analyzing image:", error);
-          resolve({
-            isDark: false,
-            dominantColor: "#ffffff",
-            accentColor: "#667eea",
-            textColor: "#333333",
-            brightness: 128,
-          });
-        }
-      };
-
-      img.onerror = () => {
-        resolve({
-          isDark: false,
-          dominantColor: "#ffffff",
-          accentColor: "#667eea",
-          textColor: "#333333",
-          brightness: 128,
-        });
-      };
-
-      img.src = imageUrl;
-    });
-  };
 
   // Apply background image and analyze colors
   useEffect(() => {
@@ -210,53 +133,44 @@ function RouteComponent() {
   }, [state]);
 
   // Function to reload shortcuts from database
-  const reloadShortcuts = async () => {
+  const reloadShortcuts = useCallback(async () => {
     try {
       setShortcutsLoading(true);
       const updatedShortcuts = await getShortcuts();
-      // console.log(
-      //   "Reloaded shortcuts:",
-      //   updatedShortcuts.map((s) => ({
-      //     id: s.id,
-      //     label: s.label,
-      //     order: s.order,
-      //   }))
-      // );
       setShortcuts(updatedShortcuts);
     } catch (error) {
       console.error("Error reloading shortcuts:", error);
     } finally {
       setShortcutsLoading(false);
     }
-  };
-  // Removed unused horlogeType state
+  }, []);
 
-  const changingStatus = () => {
+  const changingStatus = useCallback(() => {
     setShowAddShortcut((e) => !e);
-  };
-  const changingBarStatus = () => {
-    setShowBarSettings((e) => !e);
-    // //console.log(showBarSettings, "good?");
-  };
+  }, []);
 
-  const changeHorloge = () => {
-    // //console.log(horlogeType);
+  const changingBarStatus = useCallback(() => {
+    setShowBarSettings((e) => !e);
+  }, []);
+
+  const changeHorloge = useCallback(() => {
     sethorlogeType(horlogeType + 1);
     if (horlogeType > 1) {
       sethorlogeType(0);
     }
-    // Function kept for future use if needed
-  };
+  }, [horlogeType]);
 
   useEffect(() => {
     const fetchShortcuts = async () => {
       try {
+        perfMonitor.startTiming("shortcuts-load");
         setShortcutsLoading(true);
         // Initialize order for existing shortcuts that don't have it
         await initializeShortcutsOrder();
 
         // Load shortcuts using the reload function
         await reloadShortcuts();
+        perfMonitor.endTiming("shortcuts-load");
       } catch (error) {
         console.error("Error fetching shortcuts:", error);
         setShortcutsLoading(false);
@@ -264,83 +178,77 @@ function RouteComponent() {
     };
 
     fetchShortcuts();
-  }, []);
+  }, [reloadShortcuts]);
 
-  const handleSaveShortcut = async () => {
+  const handleSaveShortcut = useCallback(async () => {
     // Wait a bit longer to ensure database write is complete
     await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Use the reload function
     await reloadShortcuts();
-  };
+  }, [reloadShortcuts]);
 
-  const handleDeleteShortcut = async (idToDelete) => {
-    try {
-      await deleteShortcut(idToDelete);
-      //console.log("Shortcut deleted!");
+  const handleDeleteShortcut = useCallback(
+    async (idToDelete) => {
+      try {
+        await deleteShortcut(idToDelete);
+        await reloadShortcuts();
+      } catch (error) {
+        console.error("Error deleting shortcut:", error);
+        alert("Failed to delete shortcut. Please try again.");
+      }
+    },
+    [reloadShortcuts]
+  );
 
-      // Reload shortcuts after deletion
-      await reloadShortcuts();
-    } catch (error) {
-      console.error("Error deleting shortcut:", error);
-      alert("Failed to delete shortcut. Please try again.");
-    }
-  };
-
-  const handleUpdateShortcut = async (updatedShortcut) => {
-    try {
-      // Update the shortcut in the database
-      await updateShortcut(updatedShortcut.id, updatedShortcut);
-      //console.log("Shortcut updated in database");
-
-      // Reload shortcuts to ensure consistency
-      await reloadShortcuts();
-    } catch (error) {
-      console.error("Error updating shortcut:", error);
-      alert("Failed to update shortcut. Please try again.");
-    }
-  };
+  const handleUpdateShortcut = useCallback(
+    async (updatedShortcut) => {
+      try {
+        await updateShortcut(updatedShortcut.id, updatedShortcut);
+        await reloadShortcuts();
+      } catch (error) {
+        console.error("Error updating shortcut:", error);
+        alert("Failed to update shortcut. Please try again.");
+      }
+    },
+    [reloadShortcuts]
+  );
 
   // Drag and drop handlers
-  const handleDragStart = (id) => {
+  const handleDragStart = useCallback((id) => {
     setDraggedItem(id);
-  };
+  }, []);
 
-  const handleDragEnd = () => {
+  const handleDragEnd = useCallback(() => {
     setDraggedItem(null);
-  };
+  }, []);
 
-  const handleDrop = async (targetId) => {
-    if (draggedItem === null || draggedItem === targetId) return;
+  const handleDrop = useCallback(
+    async (targetId) => {
+      if (draggedItem === null || draggedItem === targetId) return;
 
-    const draggedIndex = shortcuts.findIndex((s) => s.id === draggedItem);
-    const targetIndex = shortcuts.findIndex((s) => s.id === targetId);
+      const draggedIndex = shortcuts.findIndex((s) => s.id === draggedItem);
+      const targetIndex = shortcuts.findIndex((s) => s.id === targetId);
 
-    if (draggedIndex === -1 || targetIndex === -1) return;
+      if (draggedIndex === -1 || targetIndex === -1) return;
 
-    // Create new array with reordered items
-    const newShortcuts = [...shortcuts];
-    const [draggedShortcut] = newShortcuts.splice(draggedIndex, 1);
-    newShortcuts.splice(targetIndex, 0, draggedShortcut);
+      // Create new array with reordered items
+      const newShortcuts = [...shortcuts];
+      const [draggedShortcut] = newShortcuts.splice(draggedIndex, 1);
+      newShortcuts.splice(targetIndex, 0, draggedShortcut);
 
-    // console.log(
-    //   "New order after drop:",
-    //   newShortcuts.map((s) => ({ id: s.id, label: s.label }))
-    // );
+      // Update state optimistically
+      setShortcuts(newShortcuts);
 
-    // Update state
-    setShortcuts(newShortcuts);
-
-    // Update database
-    try {
-      await updateShortcutsOrder(newShortcuts);
-      //console.log("Successfully updated order in database");
-    } catch (error) {
-      console.error("Failed to update shortcuts order:", error);
-      // Revert state on error
-      setShortcuts(shortcuts);
-    }
-  };
+      // Update database
+      try {
+        await updateShortcutsOrder(newShortcuts);
+      } catch (error) {
+        console.error("Failed to update shortcuts order:", error);
+        // Revert state on error
+        await reloadShortcuts();
+      }
+    },
+    [draggedItem, shortcuts, reloadShortcuts]
+  );
 
   //console.log("data :", data);
   //console.log("state :", state);
@@ -427,8 +335,11 @@ function RouteComponent() {
           </div>
         </div>
 
-        <div className="container" style={{ minHeight: "400px" }}>
-          <div className="weather-widget" style={{ minHeight: "300px" }}>
+        <div className="container" style={{ minHeight: "120px" }}>
+          <div
+            className="weather-widget"
+            style={{ minHeight: "110", maxHeight: "120" }}
+          >
             <div className="card time-card" style={{ minHeight: "120px" }}>
               {horlogeType === 0 ? (
                 <>

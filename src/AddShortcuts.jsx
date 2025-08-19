@@ -1,4 +1,5 @@
 import { addShortcut, updateShortcut } from "./dbHelper";
+import { memo } from "react";
 
 const AddShortcut = ({
   changingStatus,
@@ -152,6 +153,7 @@ const AddShortcut = ({
     outline: "none",
     fontFamily: "inherit",
     boxSizing: "border-box",
+    display: "block", // Ensure block display
   };
 
   const buttonRowStyle = {
@@ -212,6 +214,7 @@ const AddShortcut = ({
         <form
           onSubmit={mode ? handleCreateShortcut : handleUpdateShortcut}
           autoComplete="off"
+          style={{ display: "flex", flexDirection: "column" }}
         >
           <input
             type="text"
@@ -281,4 +284,4 @@ const AddShortcut = ({
   );
 };
 
-export default AddShortcut;
+export default memo(AddShortcut);

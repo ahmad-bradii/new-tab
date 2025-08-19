@@ -1,20 +1,40 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo, useCallback, useMemo } from "react";
 import styled from "styled-components";
 import { HiMiniArrowLongRight } from "react-icons/hi2";
 import { GrClearOption } from "react-icons/gr";
-// Styled Components
+// Styled Components with Performance Optimizations
 const SettingsContainer = styled.div`
   background: ${(props) =>
     props.darkMode
       ? "linear-gradient(135deg, #232526 0%, #414345 100%)"
-      : "rgba(255, 255, 255, 1)"};
+      : "rgba(255, 255, 255, 0.95)"};
   color: ${(props) => (props.darkMode ? "#fff" : "#222")};
-  padding: 32px;
+  padding: 38px;
+
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   font-family: "Segoe UI", sans-serif;
-  margin-top: 10px;
+  margin-top: 5px;
   border-radius: 20px;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+
+  /* Entrance animation */
+  opacity: 0;
+  animation: slideInRight 0.6s ease-out forwards;
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translate3d(100%, 0, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
 `;
 
 const SettingsHeader = styled.div`
@@ -28,7 +48,22 @@ const SettingsHeader = styled.div`
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  opacity: 0;
+  animation: fadeInUp 0.5s ease-out forwards;
+  animation-delay: 0.3s;
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 20px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
 `;
+
 const TitleHeader = styled.div`
   display: flex;
   align-items: center;
@@ -40,6 +75,9 @@ const TitleHeader = styled.div`
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  opacity: 0;
+  animation: fadeInUp 0.6s ease-out forwards;
+  animation-delay: 0.1s;
 `;
 
 const ToggleContainer = styled.div`
@@ -47,6 +85,15 @@ const ToggleContainer = styled.div`
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+  opacity: 0;
+  animation: fadeInUp 0.5s ease-out forwards;
+  animation-delay: 0.4s;
+  transform: translate3d(0, 0, 0);
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translate3d(0, -2px, 0);
+  }
 `;
 
 const ToggleLabel = styled.label`
@@ -66,7 +113,17 @@ const Toggle = styled.div`
     props.checked ? "#4CAF50" : props.darkMode ? "#555" : "#ccc"};
   border-radius: 25px;
   cursor: pointer;
-  transition: background 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translate3d(0, 0, 0);
+
+  &:hover {
+    transform: translate3d(0, 0, 0) scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  &:active {
+    transform: translate3d(0, 0, 0) scale(0.95);
+  }
 
   &::after {
     content: "";
@@ -77,8 +134,13 @@ const Toggle = styled.div`
     height: 21px;
     background: white;
     border-radius: 50%;
-    transition: left 0.3s ease;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transform: translate3d(0, 0, 0);
+  }
+
+  &:hover::after {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 `;
 
@@ -113,10 +175,16 @@ const ImagePreview = styled.div`
   background-position: center;
   position: relative;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translate3d(0, 0, 0);
+  opacity: 0;
+  animation: fadeInUp 0.6s ease-out forwards;
+  animation-delay: 0.5s;
 
   &:hover {
     border-color: #667eea;
+    transform: translate3d(0, -2px, 0);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
   }
 `;
 
@@ -140,20 +208,30 @@ const FileInputLabel = styled.label`
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   margin-right: 10px;
+  transform: translate3d(0, 0, 0);
+  border: 1px solid ${(props) => (props.darkMode ? "#555" : "#ddd")};
 
   &:hover {
-    transform: translateY(-2px);
+    transform: translate3d(0, -2px, 0);
     box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    border-color: #667eea;
+    background: ${(props) =>
+      props.darkMode
+        ? "rgba(102, 126, 234, 0.1)"
+        : "rgba(102, 126, 234, 0.05)"};
+  }
+
+  &:active {
+    transform: translate3d(0, 0, 0);
   }
 `;
 
 const ActionButton = styled.button`
   width: 100%;
   background: transparent;
-
-  border: none;
+  border: 1px solid rgba(67, 206, 162, 0.3);
   border-radius: 8px;
   padding: ${(props) => (props.compact ? "8px 0" : "14px 0")};
   font-weight: bold;
@@ -161,20 +239,84 @@ const ActionButton = styled.button`
   letter-spacing: 1px;
   cursor: pointer;
   box-shadow: 0 2px 12px rgba(67, 206, 162, 0.12);
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   margin-bottom: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  transform: translate3d(0, 0, 0);
+  opacity: 0;
+  animation: fadeInUp 0.5s ease-out forwards;
+  animation-delay: 0.6s;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(67, 206, 162, 0.1),
+      transparent
+    );
+    transition: left 0.5s;
+  }
 
   &:hover {
-    transform: translateY(-2px);
+    transform: translate3d(0, -2px, 0);
     box-shadow: 0 8px 25px rgba(67, 206, 162, 0.3);
+    border-color: rgba(67, 206, 162, 0.6);
+
+    &::before {
+      left: 100%;
+    }
   }
 
   &:active {
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
+  }
+`;
+
+// Notification Component with smooth animations
+const NotificationContainer = styled.div`
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: ${(props) =>
+    props.type === "error"
+      ? "linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)"
+      : "linear-gradient(135deg, #4CAF50 0%, #45a049 100%)"};
+  color: white;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  transform: translate3d(100%, 0, 0);
+  animation: slideInNotification 0.3s ease-out forwards;
+  backdrop-filter: blur(10px);
+
+  @keyframes slideInNotification {
+    to {
+      transform: translate3d(0, 0, 0);
+    }
+  }
+
+  &.fade-out {
+    animation: slideOutNotification 0.3s ease-in forwards;
+  }
+
+  @keyframes slideOutNotification {
+    to {
+      transform: translate3d(100%, 0, 0);
+      opacity: 0;
+    }
   }
 `;
 
@@ -217,45 +359,71 @@ function BarMenuSettings({
     localStorage.setItem("backgroundImage", backgroundImage);
   }, [backgroundImage]);
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        // 5MB limit
-        showNotification("Please select an image smaller than 5MB", "error");
-        return;
+  const handleImageUpload = useCallback(
+    (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (file.size > 5 * 1024 * 1024) {
+          // 5MB limit
+          showNotification("Please select an image smaller than 5MB", "error");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setBackgroundImage(event.target.result);
+          showNotification("Background image updated!", "success");
+        };
+        reader.readAsDataURL(file);
       }
+    },
+    [setBackgroundImage]
+  );
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setBackgroundImage(event.target.result);
-        showNotification("Background image updated!", "success");
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeImage = () => {
+  const removeImage = useCallback(() => {
     setBackgroundImage("./11.jpg"); // Reset to default background
     showNotification("Background reset to default", "success");
-  };
+  }, [setBackgroundImage]);
 
-  const showNotification = (message, type = "success") => {
+  const showNotification = useCallback((message, type = "success") => {
     setNotification({ message, type });
     setTimeout(() => setNotification(""), 3000);
-  };
+  }, []);
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = useCallback(() => {
     if (newState) setState(newState);
     showNotification("All settings saved successfully!", "success");
-  };
+  }, [newState, setState, showNotification]);
+
+  // Memoize background theme computation for performance
+  const backgroundThemeStyle = useMemo(() => {
+    if (!backgroundTheme) return {};
+
+    return {
+      padding: "12px",
+      marginBottom: "16px",
+      borderRadius: "8px",
+      background: `linear-gradient(135deg, ${backgroundTheme.dominantColor}20, ${backgroundTheme.accentColor}10)`,
+      border: `1px solid ${backgroundTheme.accentColor}30`,
+      color: backgroundTheme.textColor,
+      fontSize: "12px",
+      fontWeight: "500",
+      opacity: 0,
+      animation: "fadeInUp 0.5s ease-out forwards",
+      animationDelay: "0.7s",
+    };
+  }, [backgroundTheme]);
 
   return (
-    <div style={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
-      <SettingsContainer
-        darkMode={darkMode}
-        style={{ width: "400px", minWidth: "320px", position: "relative" }}
-      >
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "flex-end",
+        width: "100%",
+      }}
+      className="settings-container"
+    >
+      <SettingsContainer darkMode={darkMode} style={{ position: "relative" }}>
         {/* Top-right ActionButton */}
         <div style={{ position: "absolute", top: 16, right: 16, zIndex: 2 }}>
           <ActionButton
@@ -342,15 +510,7 @@ function BarMenuSettings({
         <SettingsHeader>Background & Theme</SettingsHeader>
 
         {backgroundTheme && (
-          <div
-            style={{
-              padding: "12px",
-              marginBottom: "16px",
-              borderRadius: "8px",
-              background: `linear-gradient(135deg, ${backgroundTheme.dominantColor}20, ${backgroundTheme.accentColor}10)`,
-              border: `1px solid ${backgroundTheme.dominantColor}30`,
-            }}
-          >
+          <div style={backgroundThemeStyle}>
             <div
               style={{
                 fontSize: "14px",
@@ -406,14 +566,14 @@ function BarMenuSettings({
             <FileInputLabel htmlFor="imageUpload">
               <ToggleLabel style={{ color: darkMode ? "#fff" : "#333" }}>
                 📁 Upload Image
+                <FileInput
+                  id="imageUpload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                />
               </ToggleLabel>
             </FileInputLabel>
-            <FileInput
-              id="imageUpload"
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-            />
 
             {backgroundImage && backgroundImage !== "./11.jpg" && (
               <ActionButton
@@ -433,8 +593,15 @@ function BarMenuSettings({
           </div>
         </ImageSection>
       </SettingsContainer>
+
+      {/* Optimized Notification System */}
+      {notification && (
+        <NotificationContainer type={notification.type}>
+          {notification.message}
+        </NotificationContainer>
+      )}
     </div>
   );
 }
 
-export default BarMenuSettings;
+export default memo(BarMenuSettings);
