@@ -30,7 +30,7 @@ async function getPrayerTimes(state) {
     }
     return await response.json();
   } catch (e) {
-    //console.log("failing fetching data", e);
+    console.log("failing fetching data", e);
   }
 }
 
@@ -44,6 +44,7 @@ function RouteComponent() {
   const [error, setError] = useState(null);
   const [state, setState] = useState("sfax");
   const [shortcuts, setShortcuts] = useState([]);
+  const [shortcutsLoading, setShortcutsLoading] = useState(true);
   const [horlogeType, sethorlogeType] = useState(0);
   const [showAddShortcut, setShowAddShortcut] = useState(false);
   const [showBarSettings, setShowBarSettings] = useState(false);
@@ -120,7 +121,7 @@ function RouteComponent() {
 
           resolve(theme);
         } catch (error) {
-          //console.log("Error analyzing image:", error);
+          console.log("Error analyzing image:", error);
           resolve({
             isDark: false,
             dominantColor: "#ffffff",
@@ -211,6 +212,7 @@ function RouteComponent() {
   // Function to reload shortcuts from database
   const reloadShortcuts = async () => {
     try {
+      setShortcutsLoading(true);
       const updatedShortcuts = await getShortcuts();
       // console.log(
       //   "Reloaded shortcuts:",
@@ -223,6 +225,8 @@ function RouteComponent() {
       setShortcuts(updatedShortcuts);
     } catch (error) {
       console.error("Error reloading shortcuts:", error);
+    } finally {
+      setShortcutsLoading(false);
     }
   };
   // Removed unused horlogeType state
@@ -246,11 +250,17 @@ function RouteComponent() {
 
   useEffect(() => {
     const fetchShortcuts = async () => {
-      // Initialize order for existing shortcuts that don't have it
-      await initializeShortcutsOrder();
+      try {
+        setShortcutsLoading(true);
+        // Initialize order for existing shortcuts that don't have it
+        await initializeShortcutsOrder();
 
-      // Load shortcuts using the reload function
-      await reloadShortcuts();
+        // Load shortcuts using the reload function
+        await reloadShortcuts();
+      } catch (error) {
+        console.error("Error fetching shortcuts:", error);
+        setShortcutsLoading(false);
+      }
     };
 
     fetchShortcuts();
@@ -356,51 +366,70 @@ function RouteComponent() {
         )}
         <div
           className="iconsContainer"
-          style={{ display: "flex", flexWrap: "wrap", padding: "20px" }}
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            padding: "20px",
+            minHeight: "120px", // Reserve space for at least one row of shortcuts
+            alignItems: "flex-start",
+          }}
         >
           {/* Website shortcut */}
-          {shortcuts.map((shortcut) => (
-            <ShortcutIcon
-              key={shortcut.id}
-              id={shortcut.id}
-              icon={shortcut.icon}
-              label={shortcut.label}
-              target={shortcut.target}
-              onDelete={handleDeleteShortcut}
-              onUpdate={handleUpdateShortcut}
-              changingStatus={changingStatus}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onDrop={handleDrop}
-              draggedItem={draggedItem}
-            />
-          ))}
-          <AddShortcutButton targelShortcut={changingStatus} />{" "}
-          {/* Fixed prop */}
-          {showAddShortcut && (
-            <div
-              className="AddShortcut_routeContainer"
-              style={{
-                padding: "10px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "50px",
-                marginLeft: "10px",
-              }}
-            >
+          {shortcutsLoading
+            ? // Skeleton placeholders to prevent layout shift
+              Array.from({ length: 3 }, (_, index) => (
+                <div
+                  key={`skeleton-${index}`}
+                  className="shortcut_container skeleton"
+                >
+                  <div className="icon skeleton-icon"></div>
+                  <span className="skeleton-text"></span>
+                </div>
+              ))
+            : shortcuts.map((shortcut) => (
+                <ShortcutIcon
+                  key={shortcut.id}
+                  id={shortcut.id}
+                  icon={shortcut.icon}
+                  label={shortcut.label}
+                  target={shortcut.target}
+                  onDelete={handleDeleteShortcut}
+                  onUpdate={handleUpdateShortcut}
+                  changingStatus={changingStatus}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onDrop={handleDrop}
+                  draggedItem={draggedItem}
+                />
+              ))}
+          <AddShortcutButton targelShortcut={changingStatus} />
+          {/* Reserve space for AddShortcut form to prevent layout shift */}
+          <div
+            className="AddShortcut_routeContainer"
+            style={{
+              width: showAddShortcut ? "320px" : "0px", // Reserve width
+              height: "100px", // Fixed height
+              overflow: "hidden",
+              transition: "width 0.3s ease-in-out",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginLeft: showAddShortcut ? "10px" : "0px",
+            }}
+          >
+            {showAddShortcut && (
               <AddShortcut
                 changingStatus={changingStatus}
                 handleSaveShortcut={handleSaveShortcut}
                 mode={true}
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        <div className="container">
-          <div className="weather-widget">
-            <div className="card time-card">
+        <div className="container" style={{ minHeight: "400px" }}>
+          <div className="weather-widget" style={{ minHeight: "300px" }}>
+            <div className="card time-card" style={{ minHeight: "120px" }}>
               {horlogeType === 0 ? (
                 <>
                   <Horloge />

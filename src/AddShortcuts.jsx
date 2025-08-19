@@ -33,7 +33,7 @@ const AddShortcut = ({
       domain = new URL(newUrl).hostname;
     } catch (err) {
       alert("Invalid URL");
-      //console.log(err);
+      console.log(err);
 
       return null;
     }

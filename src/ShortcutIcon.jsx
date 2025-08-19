@@ -91,7 +91,22 @@ const ShortcutIcon = ({
           {showShortcutlabel ? "✎" : ""}
         </button>
         <a href={target} className="shortcut-icon" onClick={handleLinkClick}>
-          <img src={icon} alt={label} className="icon" />
+          <img
+            src={icon}
+            alt={label}
+            className="icon"
+            width="40"
+            height="40"
+            loading="lazy"
+            onError={(e) => {
+              // Fallback to a placeholder if image fails to load
+              e.target.style.backgroundColor = "#f0f0f0";
+              e.target.style.display = "flex";
+              e.target.style.alignItems = "center";
+              e.target.style.justifyContent = "center";
+              e.target.textContent = label.charAt(0).toUpperCase();
+            }}
+          />
           <span>{label}</span>
         </a>
       </div>
