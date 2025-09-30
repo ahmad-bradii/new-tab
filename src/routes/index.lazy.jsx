@@ -256,6 +256,28 @@ function RouteComponent() {
   return (
     <>
       <div className="routeContainer">
+        <div
+          className="AddShortcut_routeContainer"
+          style={{
+            width: showAddShortcut ? "100%" : "0px", // Reserve width
+            height: "auto", // Fixed height
+            overflow: "hidden",
+            transition: "width 0.3s ease-in-out",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginLeft: "0",
+            padding: "0",
+          }}
+        >
+          {showAddShortcut && (
+            <AddShortcut
+              changingStatus={changingStatus}
+              handleSaveShortcut={handleSaveShortcut}
+              mode={true}
+            />
+          )}
+        </div>
         <div className="headerContainer">
           <Header action={changingBarStatus} />
         </div>
@@ -312,30 +334,12 @@ function RouteComponent() {
               ))}
           <AddShortcutButton targelShortcut={changingStatus} />
           {/* Reserve space for AddShortcut form to prevent layout shift */}
-          <div
-            className="AddShortcut_routeContainer"
-            style={{
-              width: showAddShortcut ? "320px" : "0px", // Reserve width
-              height: "100px", // Fixed height
-              overflow: "hidden",
-              transition: "width 0.3s ease-in-out",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginLeft: showAddShortcut ? "10px" : "0px",
-            }}
-          >
-            {showAddShortcut && (
-              <AddShortcut
-                changingStatus={changingStatus}
-                handleSaveShortcut={handleSaveShortcut}
-                mode={true}
-              />
-            )}
-          </div>
         </div>
 
-        <div className="container" style={{ minHeight: "120px" }}>
+        <div
+          className="container"
+          style={{ minHeight: "120px", margin: "10px" }}
+        >
           <div
             className="weather-widget"
             style={{ minHeight: "110", maxHeight: "120" }}

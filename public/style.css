@@ -15,7 +15,7 @@ body {
   background-repeat: no-repeat;
   background-attachment: fixed;
   margin: 0;
-  padding: 0 20px;
+  padding: 0 0px;
   /* Enable smooth scrolling */
   scroll-behavior: smooth;
   /* Prevent font loading layout shift */
@@ -361,7 +361,7 @@ body {
   gap: 1rem;
   justify-content: center;
   align-items: start;
-  min-height: 100vh;
+
   /* Add page load animation */
   opacity: 0;
   animation: pageLoad 0.8s ease-out 0.2s forwards;
