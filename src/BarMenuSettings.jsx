@@ -434,7 +434,7 @@ function BarMenuSettings({
               marginBottom: 0,
               width: "40px",
               height: "40px",
-              color: darkMode ? "#fff" : "#333",
+              color: darkMode ? "#545353ff" : "#333",
               fontSize: "22px",
               padding: 7,
               minWidth: 0,

@@ -7,7 +7,7 @@ function EditSettings({ action }) {
         onClick={action}
         style={{
           backgroundColor: "transparent",
-          color: "#fff",
+          color: "#6f6d6dff",
           border: "none",
           borderRadius: "4px",
           cursor: "pointer",
