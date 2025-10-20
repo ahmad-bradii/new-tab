@@ -16,7 +16,7 @@ class PerformanceMonitor {
       this.metrics[name].end = performance.now();
       this.metrics[name].duration =
         this.metrics[name].end - this.metrics[name].start;
-      console.log(`⏱️ ${name}: ${this.metrics[name].duration.toFixed(2)}ms`);
+      // console.log(`⏱️ ${name}: ${this.metrics[name].duration.toFixed(2)}ms`);
     }
   }
 
@@ -26,24 +26,24 @@ class PerformanceMonitor {
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
         if (!entry.hadRecentInput) {
-          console.log("📊 CLS Score:", entry.value.toFixed(4));
+          // console.log("📊 CLS Score:", entry.value.toFixed(4));
         }
       }
     }).observe({ type: "layout-shift", buffered: true });
 
     // Measure LCP (Largest Contentful Paint)
-    new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        console.log("🎨 LCP:", entry.startTime.toFixed(2) + "ms");
-      }
-    }).observe({ type: "largest-contentful-paint", buffered: true });
+    // new PerformanceObserver((list) => {
+    //   for (const entry of list.getEntries()) {
+    //     console.log("🎨 LCP:", entry.startTime.toFixed(2) + "ms");
+    //   }
+    // }).observe({ type: "largest-contentful-paint", buffered: true });
 
     // Measure FID (First Input Delay)
-    new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        console.log("⚡ FID:", entry.processingStart - entry.startTime + "ms");
-      }
-    }).observe({ type: "first-input", buffered: true });
+    // new PerformanceObserver((list) => {
+    //   for (const entry of list.getEntries()) {
+    //     console.log("⚡ FID:", entry.processingStart - entry.startTime + "ms");
+    //   }
+    // }).observe({ type: "first-input", buffered: true });
   }
 
   // Monitor frame rate
@@ -51,20 +51,20 @@ class PerformanceMonitor {
     let frames = 0;
     let lastTime = performance.now();
 
-    const countFrames = () => {
-      frames++;
-      const currentTime = performance.now();
+    // const countFrames = () => {
+    //   frames++;
+    //   const currentTime = performance.now();
 
-      if (currentTime >= lastTime + 1000) {
-        console.log(`🎯 FPS: ${frames}`);
-        frames = 0;
-        lastTime = currentTime;
-      }
+    //   if (currentTime >= lastTime + 1000) {
+    //     console.log(`🎯 FPS: ${frames}`);
+    //     frames = 0;
+    //     lastTime = currentTime;
+    //   }
 
-      requestAnimationFrame(countFrames);
-    };
+    //   requestAnimationFrame(countFrames);
+    // };
 
-    requestAnimationFrame(countFrames);
+    // requestAnimationFrame(countFrames);
   }
 
   // Measure memory usage (if available)
@@ -104,19 +104,19 @@ class PerformanceMonitor {
   }
 }
 
-// Initialize performance monitoring
-const perfMonitor = new PerformanceMonitor();
+// // Initialize performance monitoring
+// const perfMonitor = new PerformanceMonitor();
 
-// Start monitoring when page loads
-window.addEventListener("load", () => {
-  perfMonitor.measureCoreWebVitals();
-  perfMonitor.getPerformanceSummary();
-  perfMonitor.measureMemory();
+// // Start monitoring when page loads
+// window.addEventListener("load", () => {
+//   perfMonitor.measureCoreWebVitals();
+//   perfMonitor.getPerformanceSummary();
+//   perfMonitor.measureMemory();
 
-  // Monitor FPS in development
-  if (process.env.NODE_ENV === "development") {
-    perfMonitor.monitorFPS();
-  }
-});
+//   // Monitor FPS in development
+//   if (process.env.NODE_ENV === "development") {
+//     perfMonitor.monitorFPS();
+//   }
+// });
 
 export default perfMonitor;

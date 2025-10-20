@@ -18,14 +18,14 @@ import {
 import AddShortcut from "../AddShortcuts";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import BarMenuSettings from "../BarMenuSettings";
-import perfMonitor from "../utils/performanceMonitor";
+// import perfMonitor from "../utils/performanceMonitor";
 //
 
 async function getPrayerTimes(state) {
   try {
     const date = new Date();
     const response = await fetch(
-      `https://api.aladhan.com/v1/timingsByAddress/${date.getDay}-${date.getMonth}-${date.getFullYear}?address=tunisia-${state}`
+      `https://api.aladhan.com/v1/timingsByAddress/${date.getDay}-${date.getMonth}-${date.getFullYear}?address=${state}`
     );
     if (!response.ok) {
       throw new Error("Network response was not ok");
@@ -163,14 +163,14 @@ function RouteComponent() {
   useEffect(() => {
     const fetchShortcuts = async () => {
       try {
-        perfMonitor.startTiming("shortcuts-load");
+        // perfMonitor.startTiming("shortcuts-load");
         setShortcutsLoading(true);
         // Initialize order for existing shortcuts that don't have it
         await initializeShortcutsOrder();
 
         // Load shortcuts using the reload function
         await reloadShortcuts();
-        perfMonitor.endTiming("shortcuts-load");
+        // perfMonitor.endTiming("shortcuts-load");
       } catch (error) {
         console.error("Error fetching shortcuts:", error);
         setShortcutsLoading(false);
