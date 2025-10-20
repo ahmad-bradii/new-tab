@@ -346,14 +346,14 @@ function RouteComponent() {
           >
             <div className="card time-card" style={{ minHeight: "120px" }}>
               {horlogeType === 0 ? (
+                <Horloge />
+              ) : horlogeType === 1 ? (
+                <NumericalTimer />
+              ) : (
                 <>
                   <Horloge />
                   <NumericalTimer />
                 </>
-              ) : horlogeType === 1 ? (
-                <NumericalTimer />
-              ) : (
-                <Horloge />
               )}
 
               <button

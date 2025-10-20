@@ -13,6 +13,15 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
   },
+  server: {
+    proxy: {
+      "/api": {
+        target: "https://search-api-r2w3.onrender.com",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
   build: {
     outDir: "dist",
     rollupOptions: {

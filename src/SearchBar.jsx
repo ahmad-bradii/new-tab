@@ -49,13 +49,22 @@ const SearchBar = () => {
 
     // Create new abort controller
     abortControllerRef.current = new AbortController();
+    console.log("Fetching suggestions for:", searchTerm);
 
     try {
       setIsLoading(true);
       setError(null);
 
+      console.log(
+        "Fetching suggestions for:",
+        searchTerm,
+        "---",
+        encodeURIComponent(searchTerm)
+      );
+
+      // Use the proxy endpoint to avoid CORS issues
       const response = await fetch(
-        `https://search-api-r2w3.onrender.com/api/suggestions?q=${encodeURIComponent(searchTerm)}`,
+        `/api/suggestions?q=${encodeURIComponent(searchTerm)}`,
         {
           signal: abortControllerRef.current.signal,
           headers: {
@@ -71,8 +80,19 @@ const SearchBar = () => {
       const data = await response.json();
 
       if (!abortControllerRef.current.signal.aborted) {
-        setSuggestions(Array.isArray(data) ? data.slice(0, 8) : []); // Limit to 8 suggestions
-        setIsDropdownOpen(Array.isArray(data) && data.length > 0);
+        // Handle both formats: Google's [query, [suggestions]] or direct array
+        let suggestionsArray = [];
+        if (Array.isArray(data)) {
+          if (Array.isArray(data[1])) {
+            // Google format: [query, [suggestions]]
+            suggestionsArray = data[1];
+          } else {
+            // Direct array format from custom API
+            suggestionsArray = data;
+          }
+        }
+        setSuggestions(suggestionsArray.slice(0, 8)); // Limit to 8 suggestions
+        setIsDropdownOpen(suggestionsArray.length > 0);
         setHighlightedIndex(-1);
       }
     } catch (err) {
