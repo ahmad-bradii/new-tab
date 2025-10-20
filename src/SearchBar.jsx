@@ -49,18 +49,18 @@ const SearchBar = () => {
 
     // Create new abort controller
     abortControllerRef.current = new AbortController();
-    console.log("Fetching suggestions for:", searchTerm);
+    // console.log("Fetching suggestions for:", searchTerm);
 
     try {
       setIsLoading(true);
       setError(null);
 
-      console.log(
-        "Fetching suggestions for:",
-        searchTerm,
-        "---",
-        encodeURIComponent(searchTerm)
-      );
+      // console.log(
+      //   "Fetching suggestions for:",
+      //   searchTerm,
+      //   "---",
+      //   encodeURIComponent(searchTerm)
+      // );
 
       // Use the proxy endpoint to avoid CORS issues
       const response = await fetch(
