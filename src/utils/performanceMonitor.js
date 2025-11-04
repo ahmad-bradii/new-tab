@@ -119,4 +119,4 @@ class PerformanceMonitor {
 //   }
 // });
 
-export default perfMonitor;
+// export default perfMonitor;
