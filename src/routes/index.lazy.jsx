@@ -55,6 +55,7 @@ function RouteComponent() {
     const saved = localStorage.getItem("backgroundImage");
     return saved || "./11.jpg";
   });
+  const [searchingFocus, setSearchingFocus] = useState(false);
   const [backgroundTheme, setBackgroundTheme] = useState(() => {
     const saved = localStorage.getItem("backgroundTheme");
     return saved
@@ -68,6 +69,14 @@ function RouteComponent() {
   });
 
   // Function to analyze image and extract colors
+
+  const handleFocus = useCallback(() => {
+    setSearchingFocus(true);
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    setSearchingFocus(false);
+  }, []);
 
   // Apply background image and analyze colors
   useEffect(() => {
@@ -373,8 +382,8 @@ function RouteComponent() {
           {/* <Weather /> */}
         </div>
 
-        <div className="inputContainer">
-          <SearchBar />
+        <div className={searchingFocus ? "searchContainer" : "inputContainer"}>
+          <SearchBar handleFocus={handleFocus} handleBlur={handleBlur} />
         </div>
       </div>
     </>

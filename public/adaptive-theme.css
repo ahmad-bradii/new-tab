@@ -90,8 +90,8 @@
 .search-container {
   background: color-mix(
     in srgb,
-    var(--bg-dominant-color) 25%,
-    white 75%
+    var(--bg-dominant-color) 75%,
+    white 25%
   ) !important;
   border-color: color-mix(
     in srgb,

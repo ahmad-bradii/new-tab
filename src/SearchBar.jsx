@@ -2,13 +2,14 @@ import styled from "styled-components";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { FaSearch } from "react-icons/fa";
 
-const SearchBar = () => {
+const SearchBar = ({ handleFocus, handleBlur }) => {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isFocused, setIsFocused] = useState(false);
 
   // Refs for cleanup and scroll management
   const abortControllerRef = useRef(null);
@@ -188,6 +189,8 @@ const SearchBar = () => {
       // Navigate to search results
       if (trimmedTerm.startsWith("http") || trimmedTerm.startsWith("https")) {
         window.location.href = trimmedTerm;
+      } else if (!trimmedTerm.includes(" ") && trimmedTerm.includes(".")) {
+        window.location.href = `https://${trimmedTerm}`;
       } else {
         const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmedTerm)}`;
         window.location.href = searchUrl;
@@ -220,21 +223,43 @@ const SearchBar = () => {
   );
 
   // Handle focus with optimization
-  const handleFocus = useCallback(() => {
+  const onInputFocus = useCallback(() => {
+    setIsFocused(true);
     if (query.trim() && suggestions.length > 0) {
       setIsDropdownOpen(true);
     }
-  }, [query, suggestions.length]);
+    // Call parent's handleFocus if provided
+    if (handleFocus) {
+      handleFocus();
+    }
+  }, [query, suggestions.length, handleFocus]);
 
   // Handle blur with delay to allow clicks
-  const handleBlur = useCallback(() => {
+  const onInputBlur = useCallback(() => {
     setTimeout(() => {
+      setIsFocused(false);
       setIsDropdownOpen(false);
       setHighlightedIndex(-1);
+      // Call parent's handleBlur if provided
+      if (handleBlur) {
+        handleBlur();
+      }
     }, 200);
-  }, []);
+  }, [handleBlur]);
+
+  // Handle backdrop click to close modal
+  const handleBackdropClick = useCallback(() => {
+    setIsFocused(false);
+    setIsDropdownOpen(false);
+    setHighlightedIndex(-1);
+    if (handleBlur) {
+      handleBlur();
+    }
+  }, [handleBlur]);
+
   return (
-    <StyledWrapper>
+    <StyledWrapper className={isFocused ? "focused" : ""}>
+      {isFocused && <div className="dark-overlay" onClick={handleBackdropClick} />}
       <div className="search-container">
         <div className="input">
           <svg
@@ -268,8 +293,8 @@ const SearchBar = () => {
             type="text"
             value={query}
             onChange={handleInputChange}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
+            onFocus={onInputFocus}
+            onBlur={onInputBlur}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 handleSearch();
@@ -370,6 +395,18 @@ const SearchBar = () => {
 };
 
 const StyledWrapper = styled.div`
+  .dark-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: -1;
+    cursor: pointer;
+  }
+
   .search-container {
     position: relative;
     box-shadow:
