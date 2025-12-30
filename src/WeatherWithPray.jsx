@@ -7,6 +7,7 @@ function WeatherWithPray({ i_state, i_error, i_loading, i_data }) {
   );
   const [error, setError] = useState(i_error || null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [notifiedPrayer, setNotifiedPrayer] = useState(null);
 
   const prayerTimes = useMemo(() => {
     if (!data || !data.timings) {
@@ -91,6 +92,51 @@ function WeatherWithPray({ i_state, i_error, i_loading, i_data }) {
       };
     }
   }, [currentTime, prayerTimes]);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Check if prayer time is approaching and show notification
+  useEffect(() => {
+    if (!currentPrayer || !currentPrayer.timeRemaining) return;
+
+    const { hour, minute } = currentPrayer.timeRemaining;
+    const totalMinutes = hour * 60 + minute;
+
+    // Check if less than 5 minutes remaining and notification hasn't been shown for this prayer
+    if (
+      totalMinutes < 5 &&
+      totalMinutes > 0 &&
+      notifiedPrayer !== currentPrayer.name &&
+      "Notification" in window &&
+      Notification.permission === "granted"
+    ) {
+      const notification = new Notification("Prayer Time Approaching", {
+        body: `${currentPrayer.name} prayer in ${formatTimeRemaining(currentPrayer.timeRemaining)}`,
+        icon: "/favicon.png",
+        tag: currentPrayer.name,
+        requireInteraction: false,
+      });
+
+      // Mark this prayer as notified
+      setNotifiedPrayer(currentPrayer.name);
+
+      // Auto-close notification after 10 seconds
+      setTimeout(() => {
+        notification.close();
+      }, 10000);
+    }
+
+    // Reset notified prayer when time remaining increases (new prayer cycle)
+    if (totalMinutes >= 5 && notifiedPrayer === currentPrayer.name) {
+      setNotifiedPrayer(null);
+    }
+  }, [currentPrayer, notifiedPrayer]);
+
   useEffect(() => {
     let intervalId;
 

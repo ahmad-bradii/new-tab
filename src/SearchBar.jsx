@@ -259,7 +259,9 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
 
   return (
     <StyledWrapper className={isFocused ? "focused" : ""}>
-      {isFocused && <div className="dark-overlay" onClick={handleBackdropClick} />}
+      {isFocused && (
+        <div className="dark-overlay" onClick={handleBackdropClick} />
+      )}
       <div className="search-container">
         <div className="input">
           <svg
