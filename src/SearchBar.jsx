@@ -15,27 +15,49 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
   const abortControllerRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const suggestionRefs = useRef([]);
+  const blurTimeoutRef = useRef(null);
+  const scrollTimeoutRef = useRef(null);
 
-  // Initialize suggestion refs when suggestions change
+  // Initialize suggestion refs when suggestions change (optimized)
   useEffect(() => {
-    suggestionRefs.current = suggestionRefs.current.slice(
-      0,
-      suggestions.length
-    );
+    const currentLength = suggestionRefs.current.length;
+    const newLength = suggestions.length;
+    
+    if (newLength < currentLength) {
+      // Trim excess refs
+      suggestionRefs.current = suggestionRefs.current.slice(0, newLength);
+    } else if (newLength > currentLength) {
+      // Extend array only if needed
+      suggestionRefs.current.length = newLength;
+    }
   }, [suggestions.length]);
 
-  // Scroll highlighted item into view
+  // Scroll highlighted item into view (throttled)
   useEffect(() => {
-    if (highlightedIndex >= 0 && suggestionRefs.current[highlightedIndex]) {
-      suggestionRefs.current[highlightedIndex].scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-        inline: "nearest",
-      });
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
     }
+    
+    if (highlightedIndex >= 0 && suggestionRefs.current[highlightedIndex]) {
+      scrollTimeoutRef.current = setTimeout(() => {
+        if (suggestionRefs.current[highlightedIndex]) {
+          suggestionRefs.current[highlightedIndex].scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: "nearest",
+          });
+        }
+      }, 50);
+    }
+    
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
   }, [highlightedIndex]);
 
-  // Optimized fetch function with abort controller
+  // Multi-source fetch function - tries fastest sources first
   const fetchSuggestions = useCallback(async (searchTerm) => {
     if (!searchTerm.trim()) {
       setSuggestions([]);
@@ -50,48 +72,143 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
 
     // Create new abort controller
     abortControllerRef.current = new AbortController();
-    // console.log("Fetching suggestions for:", searchTerm);
+    const signal = abortControllerRef.current.signal;
 
     try {
       setIsLoading(true);
       setError(null);
 
-      // console.log(
-      //   "Fetching suggestions for:",
-      //   searchTerm,
-      //   "---",
-      //   encodeURIComponent(searchTerm)
-      // );
-
-      // Use the proxy endpoint to avoid CORS issues
-      const response = await fetch(
-        `/api/suggestions?q=${encodeURIComponent(searchTerm)}`,
-        {
-          signal: abortControllerRef.current.signal,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (!abortControllerRef.current.signal.aborted) {
-        // Handle both formats: Google's [query, [suggestions]] or direct array
-        let suggestionsArray = [];
+      // Helper function to parse different response formats
+      const parseSuggestions = (data) => {
         if (Array.isArray(data)) {
           if (Array.isArray(data[1])) {
             // Google format: [query, [suggestions]]
-            suggestionsArray = data[1];
+            return data[1];
           } else {
-            // Direct array format from custom API
-            suggestionsArray = data;
+            // Direct array format
+            return data;
           }
         }
+        return [];
+      };
+
+      // Source 1: Bing Autosuggest (fast, reliable, no CORS issues)
+      const fetchBingSuggest = async () => {
+        try {
+          const response = await fetch(
+            `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(searchTerm)}`,
+            {
+              signal,
+              headers: {
+                "Accept": "application/json",
+              },
+            }
+          );
+          if (!response.ok) throw new Error("Bing failed");
+          const data = await response.json();
+          if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
+            return data[1].filter((s) => s && s.trim()); // Filter out empty strings
+          }
+          return [];
+        } catch {
+          return null;
+        }
+      };
+
+      // Source 2: Current API (reliable fallback)
+      const fetchCurrentAPI = async () => {
+        try {
+          const response = await fetch(
+            `/api/suggestions?q=${encodeURIComponent(searchTerm)}`,
+            {
+              signal,
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          if (!response.ok) throw new Error("API failed");
+          const data = await response.json();
+          return parseSuggestions(data);
+        } catch {
+          return null;
+        }
+      };
+
+      // Source 3: Alternative Google Suggest (via your API proxy)
+      const fetchGoogleViaAPI = async () => {
+        try {
+          // Use your existing API but with a different endpoint if available
+          // Or try Google's endpoint through your proxy
+          const response = await fetch(
+            `/api/suggestions?q=${encodeURIComponent(searchTerm)}&source=google`,
+            {
+              signal,
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          if (!response.ok) throw new Error("Google API failed");
+          const data = await response.json();
+          return parseSuggestions(data);
+        } catch {
+          return null;
+        }
+      };
+
+      // Race multiple sources - use the first successful response
+      // Create promises that reject on error/null, so Promise.race works correctly
+      const createRacePromise = (promise, sourceName) => {
+        return promise
+          .then((result) => {
+            if (result && Array.isArray(result) && result.length > 0) {
+              return result;
+            }
+            throw new Error(`${sourceName} returned empty`);
+          })
+          .catch(() => {
+            throw new Error(`${sourceName} failed`);
+          });
+      };
+
+      // Try Bing first (usually fastest and most reliable)
+      // Then current API, then Google via API
+      const sources = [
+        createRacePromise(fetchBingSuggest(), "Bing"),
+        createRacePromise(fetchCurrentAPI(), "Current API"),
+        createRacePromise(fetchGoogleViaAPI(), "Google API"),
+      ];
+
+      // Add timeout - fail fast if nothing responds quickly
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), 1200)
+      );
+
+      let suggestionsArray = [];
+      try {
+        // Race all sources - first one to succeed wins
+        suggestionsArray = await Promise.race([...sources, timeoutPromise]);
+      } catch {
+        // If race fails, try sources sequentially as fallback
+        const fallbackSources = [fetchBingSuggest(), fetchCurrentAPI()];
+        for (const source of fallbackSources) {
+          try {
+            const result = await Promise.race([
+              source,
+              new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 800)),
+            ]);
+            if (result && Array.isArray(result) && result.length > 0) {
+              suggestionsArray = result;
+              break;
+            }
+          } catch {
+            continue;
+          }
+        }
+      }
+
+      if (!signal.aborted) {
         setSuggestions(suggestionsArray.slice(0, 8)); // Limit to 8 suggestions
         setIsDropdownOpen(suggestionsArray.length > 0);
         setHighlightedIndex(-1);
@@ -104,7 +221,7 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
         setIsDropdownOpen(false);
       }
     } finally {
-      if (!abortControllerRef.current?.signal.aborted) {
+      if (!signal.aborted) {
         setIsLoading(false);
       }
     }
@@ -118,7 +235,7 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
 
     debounceTimerRef.current = setTimeout(() => {
       fetchSuggestions(query);
-    }, 300); // 300ms debounce
+    }, 150); // 150ms debounce - faster with multi-source approach
 
     return () => {
       if (debounceTimerRef.current) {
@@ -136,67 +253,74 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
     };
   }, []);
+
+  // Optimized search function
+  const handleSearch = useCallback((searchTerm) => {
+    const trimmedTerm = (searchTerm || query).trim();
+    if (!trimmedTerm) return;
+
+    setQuery(trimmedTerm);
+    setIsDropdownOpen(false);
+    setHighlightedIndex(-1);
+
+    // Navigate to search results
+    if (trimmedTerm.startsWith("http") || trimmedTerm.startsWith("https")) {
+      window.location.href = trimmedTerm;
+    } else if (!trimmedTerm.includes(" ") && trimmedTerm.includes(".")) {
+      window.location.href = `https://${trimmedTerm}`;
+    } else {
+      const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmedTerm)}`;
+      window.location.href = searchUrl;
+    }
+  }, [query]);
 
   // Optimized keyboard navigation
   const handleKeyDown = useCallback(
     (e) => {
-      if (!isDropdownOpen || suggestions.length === 0) return;
-
       switch (e.key) {
         case "ArrowDown":
-          e.preventDefault();
-          setHighlightedIndex((prevIndex) =>
-            prevIndex < suggestions.length - 1 ? prevIndex + 1 : 0
-          );
+          if (isDropdownOpen && suggestions.length > 0) {
+            e.preventDefault();
+            setHighlightedIndex((prevIndex) =>
+              prevIndex < suggestions.length - 1 ? prevIndex + 1 : 0
+            );
+          }
           break;
         case "ArrowUp":
-          e.preventDefault();
-          setHighlightedIndex((prevIndex) =>
-            prevIndex > 0 ? prevIndex - 1 : suggestions.length - 1
-          );
+          if (isDropdownOpen && suggestions.length > 0) {
+            e.preventDefault();
+            setHighlightedIndex((prevIndex) =>
+              prevIndex > 0 ? prevIndex - 1 : suggestions.length - 1
+            );
+          }
           break;
         case "Enter":
           e.preventDefault();
-          if (highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
+          if (isDropdownOpen && highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
             handleSearch(suggestions[highlightedIndex]);
           } else {
-            handleSearch(query);
+            handleSearch();
           }
           break;
         case "Escape":
-          setIsDropdownOpen(false);
-          setHighlightedIndex(-1);
+          if (isDropdownOpen) {
+            setIsDropdownOpen(false);
+            setHighlightedIndex(-1);
+          }
           break;
         default:
           break;
       }
     },
-    [isDropdownOpen, suggestions, highlightedIndex, query]
-  );
-
-  // Optimized search function
-  const handleSearch = useCallback(
-    (searchTerm = query) => {
-      const trimmedTerm = searchTerm.trim();
-      if (!trimmedTerm) return;
-
-      setQuery(trimmedTerm);
-      setIsDropdownOpen(false);
-      setHighlightedIndex(-1);
-
-      // Navigate to search results
-      if (trimmedTerm.startsWith("http") || trimmedTerm.startsWith("https")) {
-        window.location.href = trimmedTerm;
-      } else if (!trimmedTerm.includes(" ") && trimmedTerm.includes(".")) {
-        window.location.href = `https://${trimmedTerm}`;
-      } else {
-        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(trimmedTerm)}`;
-        window.location.href = searchUrl;
-      }
-    },
-    [query]
+    [isDropdownOpen, suggestions, highlightedIndex, handleSearch]
   );
 
   // Handle input changes with optimizations
@@ -236,7 +360,10 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
 
   // Handle blur with delay to allow clicks
   const onInputBlur = useCallback(() => {
-    setTimeout(() => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+    }
+    blurTimeoutRef.current = setTimeout(() => {
       setIsFocused(false);
       setIsDropdownOpen(false);
       setHighlightedIndex(-1);
@@ -297,13 +424,7 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
             onChange={handleInputChange}
             onFocus={onInputFocus}
             onBlur={onInputBlur}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                handleSearch();
-              } else {
-                handleKeyDown(e);
-              }
-            }}
+            onKeyDown={handleKeyDown}
             placeholder="Search..."
             autoComplete="off"
             autoCorrect="off"
@@ -320,13 +441,7 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
           />
           <button
             type="button"
-            style={{
-              border: "none",
-              background: "transparent",
-              width: "50px",
-              cursor: "pointer",
-              padding: "8px",
-            }}
+            className="search-button"
             onClick={() => handleSearch()}
             aria-label="Search"
           >
@@ -336,25 +451,15 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
 
         {/* Loading indicator */}
         {isLoading && (
-          <div
-            className="loading-indicator"
-            style={{ textAlign: "center", padding: "8px" }}
-          >
-            <span style={{ fontSize: "0.9rem", color: "#666" }}>
-              Loading...
-            </span>
+          <div className="loading-indicator">
+            <span>Loading...</span>
           </div>
         )}
 
         {/* Error message */}
         {error && (
-          <div
-            className="error-message"
-            style={{ textAlign: "center", padding: "8px" }}
-          >
-            <span style={{ fontSize: "0.9rem", color: "#e53e3e" }}>
-              {error}
-            </span>
+          <div className="error-message">
+            <span>{error}</span>
           </div>
         )}
 
@@ -365,29 +470,31 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
               role="listbox"
               aria-label="Search suggestions"
             >
-              {suggestions.map((item, index) => (
-                <li
-                  key={`${item}-${index}`}
-                  ref={(el) => (suggestionRefs.current[index] = el)}
-                  onClick={() => handleSuggestionClick(item)}
-                  onMouseEnter={() => setHighlightedIndex(index)}
-                  style={{
-                    backgroundColor:
-                      index === highlightedIndex ? "#f0f8ff" : "white",
-                    cursor: "pointer",
-                    padding: "12px 16px",
-                    borderBottom:
-                      index < suggestions.length - 1
-                        ? "1px solid #f0f0f0"
-                        : "none",
-                    transition: "background-color 0.15s ease",
-                  }}
-                  role="option"
-                  aria-selected={index === highlightedIndex}
-                >
-                  {item}
-                </li>
-              ))}
+              {suggestions.map((item, index) => {
+                const isHighlighted = index === highlightedIndex;
+                return (
+                  <li
+                    key={`${item}-${index}`}
+                    ref={(el) => (suggestionRefs.current[index] = el)}
+                    onClick={() => handleSuggestionClick(item)}
+                    onMouseEnter={() => setHighlightedIndex(index)}
+                    className={`suggestion-item ${isHighlighted ? "highlighted" : ""}`}
+                    style={{
+                      animationDelay: `${index * 0.02}s`,
+                    }}
+                    role="option"
+                    aria-selected={isHighlighted}
+                  >
+                    <span className="suggestion-icon">
+                      <FaSearch size={14} />
+                    </span>
+                    <span className="suggestion-text">{item}</span>
+                    {isHighlighted && (
+                      <span className="suggestion-shortcut">↵</span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -484,6 +591,14 @@ const StyledWrapper = styled.div`
     --s: 1.25;
   }
 
+  .search-button {
+    border: none;
+    background: transparent;
+    width: 50px;
+    cursor: pointer;
+    padding: 8px;
+  }
+
   @keyframes pop {
     50% {
       scale: var(--s, 1);
@@ -528,29 +643,61 @@ const StyledWrapper = styled.div`
   }
 
   .suggestions-dropdown {
-    margin: 4px 0 0 0;
+    margin: 8px 0 0 0;
     min-width: 400px;
     max-width: 800px;
-    max-height: 300px;
+    max-height: 400px;
     overflow-y: auto;
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
+    overflow-x: hidden;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 16px;
     box-shadow:
-      0 20px 25px -5px rgb(0 0 0 / 0.1),
-      0 10px 10px -5px rgb(0 0 0 / 0.04);
+      0 20px 25px -5px rgba(0, 0, 0, 0.12),
+      0 10px 10px -5px rgba(0, 0, 0, 0.06),
+      0 0 0 1px rgba(255, 255, 255, 0.5) inset;
     font-size: 1rem;
     list-style: none;
-    padding: 0;
-    backdrop-filter: blur(10px);
-    animation: slideDown 0.2s ease-out;
+    padding: 8px;
+    animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     scroll-behavior: smooth;
   }
 
   @keyframes slideDown {
     from {
       opacity: 0;
-      transform: translateY(-10px);
+      transform: translateY(-12px) scale(0.98);
+      filter: blur(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+
+  .suggestions-dropdown .suggestion-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    margin: 2px 0;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 400;
+    color: #1f2937;
+    position: relative;
+    border-radius: 10px;
+    background: transparent;
+    border: 1px solid transparent;
+    animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
@@ -558,62 +705,142 @@ const StyledWrapper = styled.div`
     }
   }
 
-  .suggestions-dropdown li {
-    padding: 12px 16px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    font-weight: 400;
-    color: #374151;
-    position: relative;
+  .suggestions-dropdown .suggestion-item:hover {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 51, 234, 0.05) 100%);
+    border-color: rgba(59, 130, 246, 0.2);
+    transform: translateX(4px);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
   }
 
-  .suggestions-dropdown li:hover,
-  .suggestions-dropdown li[aria-selected="true"] {
-    background-color: #f0f8ff;
+  .suggestions-dropdown .suggestion-item.highlighted,
+  .suggestions-dropdown .suggestion-item[aria-selected="true"] {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(147, 51, 234, 0.08) 100%);
+    border-color: rgba(59, 130, 246, 0.3);
     color: #1e40af;
-    transform: translateX(2px);
+    transform: translateX(6px);
+    box-shadow: 
+      0 4px 12px rgba(59, 130, 246, 0.15),
+      0 0 0 2px rgba(59, 130, 246, 0.1) inset;
+    font-weight: 500;
   }
 
-  .suggestions-dropdown li[aria-selected="true"]::before {
+  .suggestions-dropdown .suggestion-item.highlighted::before {
     content: "";
     position: absolute;
     left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: #1e40af;
-    border-radius: 0 2px 2px 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 60%;
+    background: linear-gradient(180deg, #3b82f6 0%, #9333ea 100%);
+    border-radius: 0 4px 4px 0;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
   }
 
-  .suggestions-dropdown li:first-child {
-    border-radius: 12px 12px 0 0;
+  .suggestion-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
   }
 
-  .suggestions-dropdown li:last-child {
-    border-radius: 0 0 12px 12px;
+  .suggestion-item.highlighted .suggestion-icon,
+  .suggestion-item[aria-selected="true"] .suggestion-icon {
+    background: linear-gradient(135deg, #3b82f6 0%, #9333ea 100%);
+    color: white;
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
   }
 
-  .suggestions-dropdown li:only-child {
-    border-radius: 12px;
+  .suggestion-text {
+    flex: 1;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .suggestion-shortcut {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 6px;
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+  }
+
+  .suggestions-dropdown .suggestion-item:first-child {
+    margin-top: 0;
+  }
+
+  .suggestions-dropdown .suggestion-item:last-child {
+    margin-bottom: 0;
   }
 
   .loading-indicator,
   .error-message {
-    margin: 4px 0 0 0;
-    padding: 8px 16px;
-    border-radius: 8px;
+    margin: 8px 0 0 0;
+    padding: 16px;
+    border-radius: 12px;
     font-size: 0.9rem;
-    animation: fadeIn 0.2s ease-out;
+    animation: fadeIn 0.25s ease-out;
+    text-align: center;
+    backdrop-filter: blur(10px);
   }
 
   .loading-indicator {
-    background: transparent;
-    color: #576170ff;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 51, 234, 0.05) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+  }
+
+  .loading-indicator span {
+    font-size: 0.9rem;
+    color: #3b82f6;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .loading-indicator span::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .error-message {
-    background: rgba(239, 68, 68, 0.1);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.08) 100%);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .error-message span {
+    font-size: 0.9rem;
     color: #dc2626;
+    font-weight: 500;
   }
 
   @keyframes fadeIn {
@@ -627,21 +854,25 @@ const StyledWrapper = styled.div`
 
   /* Scrollbar styling for suggestions */
   .suggestions-dropdown::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
   }
 
   .suggestions-dropdown::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 3px;
+    background: rgba(241, 245, 249, 0.5);
+    border-radius: 10px;
+    margin: 8px 0;
   }
 
   .suggestions-dropdown::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 3px;
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.4) 0%, rgba(147, 51, 234, 0.4) 100%);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
 
   .suggestions-dropdown::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.6) 0%, rgba(147, 51, 234, 0.6) 100%);
+    background-clip: padding-box;
   }
 
   /* Responsive design */
