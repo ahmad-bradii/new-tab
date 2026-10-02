@@ -1,286 +1,142 @@
-import { addShortcut, updateShortcut } from "./dbHelper";
-import { memo } from "react";
+import { useEffect, useState, memo } from "react";
+import { createPortal } from "react-dom";
 
-const AddShortcut = ({
-  changingStatus,
-  handleSaveShortcut,
-  onUpdate,
-  id,
-  mode,
-  onDelete,
-  target,
-}) => {
-  const fetchingData = (e) => {
+export const faviconFor = (url) =>
+  `https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(url)}&size=128`;
+
+// Accepts "youtube.com" as well as full URLs
+const normalizeUrl = (value) => {
+  const trimmed = value.trim();
+  const withScheme = /^[a-z][a-z\d+.-]*:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+  const url = new URL(withScheme);
+  if (!url.hostname.includes(".") && url.hostname !== "localhost") {
+    throw new Error("no domain");
+  }
+  return url.href;
+};
+
+// Add and edit share one sheet; `shortcut` is set when editing
+const AddShortcut = ({ shortcut, onClose, onSave, onDelete }) => {
+  const isEdit = Boolean(shortcut);
+  const [name, setName] = useState(shortcut?.label ?? "");
+  const [url, setUrl] = useState(shortcut?.target ?? "");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    //console.log("hello");
-    //console.log(target);
-    const form = e.target;
-    if (!(form instanceof HTMLFormElement)) {
-      console.error("Expected form element.");
-      return null;
+    if (!name.trim()) {
+      setError("Enter a name for this shortcut.");
+      return;
     }
-    const formData = new FormData(form);
-    const newName = formData.get("name");
-    let newUrl = formData.get("url");
-    if ((!newName || !newUrl) && mode) {
-      alert("Please enter both Name and URL.");
-      return null;
-    }
-    let domain;
+    let href;
     try {
-      if (newUrl.length == 0) {
-        newUrl = target;
-      }
-      domain = new URL(newUrl).hostname;
+      href = normalizeUrl(url);
+    } catch {
+      setError("Enter a web address, like youtube.com.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onSave({ label: name.trim(), target: href, icon: faviconFor(href) });
+      onClose();
     } catch (err) {
-      alert("Invalid URL");
-      console.log(err);
-
-      return null;
-    }
-    form.reset();
-    return { name: newName, url: newUrl, domain };
-  };
-
-  const handleCreateShortcut = async (e) => {
-    const data = fetchingData(e);
-    //console.log("domain: ", data.url);
-    if (!data) return;
-    const newShortcut = {
-      id: Date.now(),
-      label: data.name,
-      icon: `https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${data.url}/&size=128`,
-      target: data.url,
-    };
-
-    try {
-      await addShortcut(newShortcut);
-      //console.log("Shortcut added successfully!");
-      if (handleSaveShortcut) await handleSaveShortcut();
-      changingStatus(); // Close the add shortcut form
-    } catch (error) {
-      console.error("Error adding shortcut:", error);
-      alert("Failed to add shortcut. Please try again.");
+      console.error("Error saving shortcut:", err);
+      setError("The shortcut couldn't be saved. Try again.");
+      setSaving(false);
     }
   };
 
-  const handleUpdateShortcut = async (e) => {
-    const data = fetchingData(e);
-    if (!data) return;
-    const newShortcut = {
-      label: data.name,
-      icon: `https://www.google.com/s2/favicons?domain=${data.domain}&sz=128`,
-      target: data.url,
-    };
-
-    try {
-      await updateShortcut(id, newShortcut);
-      onUpdate({ ...newShortcut, id });
-      //console.log("Shortcut updated!");
-      changingStatus(); // Close the edit form
-    } catch (error) {
-      console.error("Error updating shortcut:", error);
-      alert("Failed to update shortcut. Please try again.");
-    }
-  };
-
-  const handleDeleteClick = (e) => {
-    e.stopPropagation();
-    if (onDelete) onDelete(id);
-  };
-
-  // Improved styles
-  const modalStyle = {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    width: "100vw",
-    height: "100vh",
-    background: "rgba(0, 0, 0, 0.6)",
-    backdropFilter: "blur(4px)",
-    zIndex: 9999,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "20px",
-    boxSizing: "border-box",
-  };
-
-  const cardStyle = {
-    background: "#ffffff",
-    borderRadius: 20,
-    padding: "32px",
-    boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3), 0 8px 25px rgba(0, 0, 0, 0.2)",
-    minWidth: "320px",
-    maxWidth: "450px",
-    width: "100%",
-    maxHeight: "90vh",
-    border: "1px solid rgba(255, 255, 255, 0.2)",
-    display: "flex",
-    flexDirection: "column",
-    gap: 20,
-    animation: "modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-    position: "relative",
-    overflow: "hidden",
-  };
-
-  const titleStyle = {
-    fontSize: "28px",
-    fontWeight: 700,
-    marginBottom: "8px",
-    color: "#1a202c",
-    letterSpacing: "-0.5px",
-    textAlign: "center",
-  };
-
-  const descStyle = {
-    fontSize: "16px",
-    color: "#718096",
-    marginBottom: "24px",
-    textAlign: "center",
-    lineHeight: 1.5,
-  };
-
-  const inputStyle = {
-    width: "100%",
-    padding: "14px 16px",
-    marginBottom: "16px",
-    borderRadius: "12px",
-    border: "2px solid #e2e8f0",
-    fontSize: "16px",
-    background: "#f7fafc",
-    transition: "all 0.2s ease",
-    outline: "none",
-    fontFamily: "inherit",
-    boxSizing: "border-box",
-    display: "block", // Ensure block display
-  };
-
-  const buttonRowStyle = {
-    display: "flex",
-    gap: "12px",
-    marginTop: "8px",
-  };
-
-  const primaryBtn = {
-    padding: "14px 0",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "12px",
-    cursor: "pointer",
-    fontWeight: 600,
-    fontSize: "16px",
-    flex: 1,
-    transition: "all 0.2s ease",
-    boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
-  };
-
-  const dangerBtn = {
-    ...primaryBtn,
-    background: "linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)",
-    boxShadow: "0 4px 15px rgba(255, 107, 107, 0.4)",
-  };
-
-  const doneBtn = {
-    ...primaryBtn,
-    background: "linear-gradient(135deg, #74b9ff 0%, #0984e3 100%)",
-    boxShadow: "0 4px 15px rgba(116, 185, 255, 0.4)",
-  };
-
-  return (
+  return createPortal(
     <div
-      style={modalStyle}
+      className="sheet-backdrop"
       onClick={(e) => {
-        if (e.target === e.currentTarget) changingStatus();
+        if (e.target === e.currentTarget) onClose();
       }}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") changingStatus();
-      }}
-      tabIndex={-1}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-title"
     >
-      <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
-        <div id="modal-title" style={titleStyle}>
-          {mode ? "Add Shortcut" : "Edit Shortcut"}
-        </div>
-        <div style={descStyle}>
-          {mode
-            ? "Enter the details for your new shortcut."
-            : "Update the shortcut details below."}
-        </div>
-        <form
-          onSubmit={mode ? handleCreateShortcut : handleUpdateShortcut}
-          autoComplete="off"
-          style={{ display: "flex", flexDirection: "column" }}
-        >
-          <input
-            type="text"
-            placeholder="Name"
-            name="name"
-            required
-            style={inputStyle}
-            autoFocus
-          />
-          <input
-            type="text"
-            placeholder="Url"
-            name="url"
-            required={!!mode}
-            style={inputStyle}
-          />
-          <div style={buttonRowStyle}>
-            <button type="submit" style={primaryBtn}>
-              {mode ? "Add" : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={mode ? changingStatus : handleDeleteClick}
-              style={mode ? doneBtn : dangerBtn}
-            >
-              {mode ? "Cancel" : "Delete"}
-            </button>
+      <form
+        className="sheet glass glass--thick"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sheet-title"
+        onSubmit={handleSubmit}
+        autoComplete="off"
+        noValidate
+      >
+        <h2 id="sheet-title">{isEdit ? "Edit shortcut" : "New shortcut"}</h2>
+        <p className="sheet-intro">
+          {isEdit
+            ? "Change the name or address. Its spot on the page stays the same."
+            : "It appears under the search bar. Drag it anywhere afterwards."}
+        </p>
+
+        <div className="field-group">
+          <div className="field">
+            <label htmlFor="shortcut-name">Name</label>
+            <input
+              id="shortcut-name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setError("");
+              }}
+              placeholder="YouTube"
+              autoFocus
+            />
           </div>
-        </form>
-      </div>
-      <style>
-        {`
-          @keyframes modalSlideIn {
-            from { 
-              opacity: 0; 
-              transform: translateY(30px) scale(0.95);
-            }
-            to { 
-              opacity: 1; 
-              transform: translateY(0) scale(1);
-            }
-          }
-          
-          input:focus {
-            border: 2px solid #667eea !important;
-            background: #ffffff !important;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
-          }
-          
-          button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-          }
-          
-          button:active {
-            transform: translateY(0);
-            opacity: 0.9;
-          }
-          
-          input::placeholder {
-            color: #a0aec0;
-            font-weight: 400;
-          }
-        `}
-      </style>
-    </div>
+          <div className="field">
+            <label htmlFor="shortcut-url">URL</label>
+            <input
+              id="shortcut-url"
+              value={url}
+              onChange={(e) => {
+                setUrl(e.target.value);
+                setError("");
+              }}
+              placeholder="youtube.com"
+              inputMode="url"
+              spellCheck="false"
+              autoCapitalize="off"
+            />
+          </div>
+        </div>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+
+        <div className="sheet-actions">
+          <button type="button" className="button button--plain" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="button button--primary" disabled={saving}>
+            {isEdit ? "Save" : "Add shortcut"}
+          </button>
+        </div>
+        {isEdit && (
+          <button
+            type="button"
+            className="button button--danger sheet-delete"
+            onClick={() => onDelete(shortcut.id)}
+          >
+            Delete shortcut
+          </button>
+        )}
+      </form>
+    </div>,
+    document.getElementById("modal") || document.body
   );
 };
 

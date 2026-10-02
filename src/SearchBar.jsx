@@ -1,13 +1,39 @@
-import styled from "styled-components";
-import { useState, useEffect, useCallback, useRef } from "react";
-import { FaSearch } from "react-icons/fa";
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from "react";
+import { Search, ArrowUp, CalendarDays, Newspaper, Globe } from "lucide-react";
+import { LiquidLens } from "./liquidLens";
+import { isExtension } from "./feeds";
+import { toArabic, cachedArabic, wordBefore, looksLikeUrl } from "./arabizi";
 
-const SearchBar = ({ handleFocus, handleBlur }) => {
+// The extension has no /api of its own, so it calls the suggestions service directly
+const SUGGEST_API = isExtension ? "https://search-api-r2w3.onrender.com" : "";
+
+const GROUP_ORDER = ["Shortcuts", "Google apps", "Calendar", "News"];
+const PER_GROUP = 3;
+
+// Ranks local items (shortcuts, apps, events, headlines) against the query,
+// the way Spotlight puts things you own above web results.
+function matchLocal(items, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const scored = [];
+  for (const item of items) {
+    const title = item.title.toLowerCase();
+    let score = 0;
+    if (title.startsWith(q)) score = 3;
+    else if (title.split(/\s+/).some((w) => w.startsWith(q))) score = 2;
+    else if (title.includes(q)) score = 1;
+    else if (q.length > 2 && item.subtitle?.toLowerCase().includes(q)) score = 0.5;
+    if (score > 0) scored.push({ ...item, score });
+  }
+  return scored.sort((a, b) => b.score - a.score);
+}
+
+const SearchBar = ({ handleFocus, handleBlur, localItems = [] }) => {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [isLoading, setIsLoading] = useState(false);
+  const [, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -17,6 +43,77 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
   const suggestionRefs = useRef([]);
   const blurTimeoutRef = useRef(null);
   const scrollTimeoutRef = useRef(null);
+  const capsuleRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // Arabic typing: Latin letters turn into Arabic script, Yamli style
+  const [arabic, setArabic] = useState(() => {
+    try {
+      return localStorage.getItem("arabicTyping") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [candidates, setCandidates] = useState(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("arabicTyping", arabic ? "1" : "0");
+    } catch {
+      // Storage blocked; the choice lasts for this tab only
+    }
+  }, [arabic]);
+
+  // Fetch Arabic spellings for the word at the caret while it is typed
+  useEffect(() => {
+    const input = inputRef.current;
+    const target =
+      arabic && input && !looksLikeUrl(query)
+        ? wordBefore(query, input.selectionStart ?? query.length)
+        : null;
+    if (!target) {
+      setCandidates(null);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      toArabic(target.word, controller.signal)
+        .then((list) => setCandidates(list.length ? { ...target, list } : null))
+        .catch(() => {});
+    }, 120);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [arabic, query]);
+
+  // Swaps the Latin word at target for its Arabic spelling, keeping the caret
+  // where it was relative to the text after it. Returns the new text, or null
+  // if the word has been edited since.
+  const replaceWord = useCallback((target, replacement, suffix = "") => {
+    const input = inputRef.current;
+    const value = input?.value ?? "";
+    if (value.slice(target.start, target.end) !== target.word) return null;
+    const next =
+      value.slice(0, target.start) + replacement + suffix + value.slice(target.end);
+    const caret =
+      (input.selectionStart ?? value.length) +
+      next.length -
+      value.length;
+    caretRef.current = caret;
+    setQuery(next);
+    setCandidates(null);
+    return next;
+  }, []);
+
+  // Put the caret back as soon as the new text is committed, before the next
+  // keystroke can land at the wrong place
+  const caretRef = useRef(null);
+  useLayoutEffect(() => {
+    if (caretRef.current === null) return;
+    inputRef.current?.setSelectionRange(caretRef.current, caretRef.current);
+    caretRef.current = null;
+  }, [query]);
 
   // Initialize suggestion refs when suggestions change (optimized)
   useEffect(() => {
@@ -119,7 +216,7 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
       const fetchCurrentAPI = async () => {
         try {
           const response = await fetch(
-            `/api/suggestions?q=${encodeURIComponent(searchTerm)}`,
+            `${SUGGEST_API}/api/suggestions?q=${encodeURIComponent(searchTerm)}`,
             {
               signal,
               headers: {
@@ -141,7 +238,7 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
           // Use your existing API but with a different endpoint if available
           // Or try Google's endpoint through your proxy
           const response = await fetch(
-            `/api/suggestions?q=${encodeURIComponent(searchTerm)}&source=google`,
+            `${SUGGEST_API}/api/suggestions?q=${encodeURIComponent(searchTerm)}&source=google`,
             {
               signal,
               headers: {
@@ -209,16 +306,13 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
       }
 
       if (!signal.aborted) {
-        setSuggestions(suggestionsArray.slice(0, 8)); // Limit to 8 suggestions
-        setIsDropdownOpen(suggestionsArray.length > 0);
-        setHighlightedIndex(-1);
+        setSuggestions(suggestionsArray.slice(0, 6));
       }
     } catch (err) {
       if (err.name !== "AbortError") {
         console.error("Error fetching suggestions:", err);
         setError("Failed to load suggestions");
         setSuggestions([]);
-        setIsDropdownOpen(false);
       }
     } finally {
       if (!signal.aborted) {
@@ -282,610 +376,314 @@ const SearchBar = ({ handleFocus, handleBlur }) => {
     }
   }, [query]);
 
-  // Optimized keyboard navigation
+  // Top hit first, then each local group, then web suggestions
+  const results = useMemo(() => {
+    // A shortcut and a Google app can point at the same site; show it once
+    const seen = new Set();
+    const sameSite = (href) => {
+      try {
+        const u = new URL(href);
+        return u.hostname.replace(/^www\./, "") + u.pathname.replace(/\/$/, "");
+      } catch {
+        return href;
+      }
+    };
+    const matches = matchLocal(localItems, query).filter((m) => {
+      const id = sameSite(m.href);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    const out = [];
+    if (matches.length && matches[0].score >= 2) {
+      out.push({ ...matches[0], kind: "link", group: "Top hit" });
+    }
+    for (const group of GROUP_ORDER) {
+      matches
+        .filter((m) => m.group === group && m.key !== out[0]?.key)
+        .slice(0, PER_GROUP)
+        .forEach((m) => out.push({ ...m, kind: "link" }));
+    }
+    const typed = query.trim();
+    if (typed) {
+      const web = suggestions.filter((t) => t.toLowerCase() !== typed.toLowerCase());
+      [typed, ...web].forEach((text, i) =>
+        out.push({ key: `web-${i}-${text}`, kind: "web", group: "Search the web", title: text })
+      );
+    }
+    return out;
+  }, [localItems, query, suggestions]);
+
+  const showResults = isFocused && isDropdownOpen && query.trim() && results.length > 0;
+
+  const activate = useCallback(
+    (result) => {
+      if (result.kind === "web") handleSearch(result.title);
+      else window.location.href = result.href;
+    },
+    [handleSearch]
+  );
+
+  // "/" or Ctrl/Cmd+K opens search from anywhere on the page
+  useEffect(() => {
+    const onKey = (e) => {
+      const typing = e.target.closest?.("input, textarea, [contenteditable='true']");
+      const isShortcut =
+        (e.key === "k" && (e.metaKey || e.ctrlKey)) || (e.key === "/" && !typing);
+      if (isShortcut) {
+        e.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // The Latin word just typed, if Arabic typing should convert it
+  const pendingWord = useCallback(() => {
+    const input = inputRef.current;
+    if (!arabic || !input || looksLikeUrl(input.value)) return null;
+    if (input.selectionStart !== input.selectionEnd) return null;
+    return wordBefore(input.value, input.selectionStart);
+  }, [arabic]);
+
   const handleKeyDown = useCallback(
     (e) => {
+      // Space converts the word before it; Shift+Space keeps it in Latin
+      if (e.key === " " && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const target = pendingWord();
+        if (target) {
+          e.preventDefault();
+          const list = cachedArabic(target.word);
+          if (list?.length) {
+            replaceWord(target, list[0], " ");
+          } else {
+            // Not fetched yet: type the space now and swap the word when the
+            // spelling arrives, unless it has been edited by then
+            replaceWord(target, target.word, " ");
+            toArabic(target.word)
+              .then((found) => found.length && replaceWord(target, found[0]))
+              .catch(() => {});
+          }
+          return;
+        }
+      }
       switch (e.key) {
         case "ArrowDown":
-          if (isDropdownOpen && suggestions.length > 0) {
+          if (showResults) {
             e.preventDefault();
-            setHighlightedIndex((prevIndex) =>
-              prevIndex < suggestions.length - 1 ? prevIndex + 1 : 0
-            );
+            setHighlightedIndex((i) => (i < results.length - 1 ? i + 1 : 0));
           }
           break;
         case "ArrowUp":
-          if (isDropdownOpen && suggestions.length > 0) {
+          if (showResults) {
             e.preventDefault();
-            setHighlightedIndex((prevIndex) =>
-              prevIndex > 0 ? prevIndex - 1 : suggestions.length - 1
-            );
+            setHighlightedIndex((i) => (i > 0 ? i - 1 : results.length - 1));
           }
           break;
         case "Enter":
           e.preventDefault();
-          if (isDropdownOpen && highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
-            handleSearch(suggestions[highlightedIndex]);
+          if (showResults && highlightedIndex >= 0 && results[highlightedIndex]) {
+            activate(results[highlightedIndex]);
+          } else if (showResults && results[0]?.group === "Top hit") {
+            activate(results[0]);
           } else {
-            handleSearch();
+            // Convert the last word too, so "salam" searches for سلام
+            const target = pendingWord();
+            const list = target && cachedArabic(target.word);
+            const converted = list?.length && replaceWord(target, list[0]);
+            handleSearch(converted || undefined);
           }
           break;
         case "Escape":
-          if (isDropdownOpen) {
+          if (showResults) {
             setIsDropdownOpen(false);
             setHighlightedIndex(-1);
+          } else {
+            e.currentTarget.blur();
           }
           break;
         default:
           break;
       }
     },
-    [isDropdownOpen, suggestions, highlightedIndex, handleSearch]
+    [showResults, results, highlightedIndex, activate, handleSearch, pendingWord, replaceWord]
   );
 
-  // Handle input changes with optimizations
   const handleInputChange = useCallback(
     (e) => {
-      const value = e.target.value;
-      setQuery(value);
+      setQuery(e.target.value);
+      setIsDropdownOpen(true);
       setHighlightedIndex(-1);
-
-      // Clear error when user starts typing
-      if (error) {
-        setError(null);
-      }
+      if (error) setError(null);
     },
     [error]
   );
 
-  // Handle suggestion click
-  const handleSuggestionClick = useCallback(
-    (suggestion) => {
-      handleSearch(suggestion);
-    },
-    [handleSearch]
-  );
-
-  // Handle focus with optimization
   const onInputFocus = useCallback(() => {
+    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
     setIsFocused(true);
-    if (query.trim() && suggestions.length > 0) {
-      setIsDropdownOpen(true);
-    }
-    // Call parent's handleFocus if provided
-    if (handleFocus) {
-      handleFocus();
-    }
-  }, [query, suggestions.length, handleFocus]);
+    setIsDropdownOpen(true);
+    if (handleFocus) handleFocus();
+  }, [handleFocus]);
 
-  // Handle blur with delay to allow clicks
+  // Delay so a click on a result lands before the panel closes
   const onInputBlur = useCallback(() => {
-    if (blurTimeoutRef.current) {
-      clearTimeout(blurTimeoutRef.current);
-    }
+    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
     blurTimeoutRef.current = setTimeout(() => {
       setIsFocused(false);
       setIsDropdownOpen(false);
       setHighlightedIndex(-1);
-      // Call parent's handleBlur if provided
-      if (handleBlur) {
-        handleBlur();
-      }
+      if (handleBlur) handleBlur();
     }, 200);
   }, [handleBlur]);
 
-  // Handle backdrop click to close modal
-  const handleBackdropClick = useCallback(() => {
-    setIsFocused(false);
-    setIsDropdownOpen(false);
-    setHighlightedIndex(-1);
-    if (handleBlur) {
-      handleBlur();
-    }
-  }, [handleBlur]);
+  const activeId =
+    showResults && highlightedIndex >= 0 ? `result-${highlightedIndex}` : undefined;
+
+  const resultIcon = (r) => {
+    if (r.kind === "web") return r.title === query.trim() ? <Search aria-hidden="true" /> : <Globe aria-hidden="true" />;
+    if (r.iconUrl) return <img src={r.iconUrl} alt="" width={20} height={20} />;
+    if (r.glyph === "calendar") return <CalendarDays aria-hidden="true" />;
+    return <Newspaper aria-hidden="true" />;
+  };
 
   return (
-    <StyledWrapper className={isFocused ? "focused" : ""}>
-      {isFocused && (
-        <div className="dark-overlay" onClick={handleBackdropClick} />
-      )}
-      <div className="search-container">
-        <div className="input">
-          <svg
-            className="svgClass"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              fillRule="evenodd"
-              clipRule="evenodd"
-              d="M11.5 6C11.3949 6.00006 11.2925 5.96705 11.2073 5.90565C11.1221 5.84425 11.0583 5.75758 11.0251 5.65792L10.7623 4.86908C10.6623 4.57101 10.4288 4.33629 10.13 4.23693L9.34102 3.97354C9.24166 3.94019 9.1553 3.87649 9.09411 3.79142C9.03292 3.70635 9 3.60421 9 3.49943C9 3.39465 9.03292 3.29252 9.09411 3.20745C9.1553 3.12238 9.24166 3.05867 9.34102 3.02532L10.13 2.76193C10.4282 2.66191 10.663 2.42852 10.7623 2.12979L11.0258 1.34094C11.0591 1.24161 11.1229 1.15526 11.2079 1.09409C11.293 1.03291 11.3952 1 11.5 1C11.6048 1 11.707 1.03291 11.7921 1.09409C11.8771 1.15526 11.9409 1.24161 11.9742 1.34094L12.2377 2.12979C12.2868 2.27697 12.3695 2.4107 12.4792 2.52041C12.589 2.63013 12.7227 2.71281 12.87 2.76193L13.659 3.02532C13.7583 3.05867 13.8447 3.12238 13.9059 3.20745C13.9671 3.29252 14 3.39465 14 3.49943C14 3.60421 13.9671 3.70635 13.9059 3.79142C13.8447 3.87649 13.7583 3.94019 13.659 3.97354L12.87 4.23693C12.5718 4.33696 12.337 4.57034 12.2377 4.86908L11.9742 5.65792C11.9411 5.75747 11.8774 5.84406 11.7923 5.90545C11.7072 5.96684 11.6049 5.99992 11.5 6Z"
-              fill="currentColor"
-            />
-            <path
-              fillRule="evenodd"
-              clipRule="evenodd"
-              d="M6 13C5.85133 13.0001 5.7069 12.9504 5.58969 12.859C5.47247 12.7675 5.38921 12.6395 5.35313 12.4952L5.12388 11.5745C4.91418 10.7391 4.26198 10.0868 3.42674 9.87703L2.50619 9.64774C2.36169 9.61194 2.23333 9.52878 2.14159 9.41151C2.04985 9.29425 2 9.14964 2 9.00075C2 8.85185 2.04985 8.70724 2.14159 8.58998C2.23333 8.47272 2.36169 8.38955 2.50619 8.35376L3.42674 8.12446C4.26198 7.91473 4.91418 7.2624 5.12388 6.427L5.35313 5.50629C5.38892 5.36176 5.47207 5.23338 5.58931 5.14162C5.70655 5.04986 5.85113 5 6 5C6.14887 5 6.29345 5.04986 6.41069 5.14162C6.52793 5.23338 6.61108 5.36176 6.64687 5.50629L6.87612 6.427C6.97865 6.83721 7.19071 7.21184 7.48965 7.51082C7.78858 7.80981 8.16313 8.02192 8.57326 8.12446L9.49381 8.35376C9.63831 8.38955 9.76667 8.47272 9.85841 8.58998C9.95015 8.70724 10 8.85185 10 9.00075C10 9.14964 9.95015 9.29425 9.85841 9.41151C9.76667 9.52878 9.63831 9.61194 9.49381 9.64774L8.57326 9.87703C8.16313 9.97957 7.78858 10.1917 7.48965 10.4907C7.19071 10.7897 6.97865 11.1643 6.87612 11.5745L6.64687 12.4952C6.61079 12.6395 6.52753 12.7675 6.41031 12.859C6.2931 12.9504 6.14867 13.0001 6 13Z"
-              fill="currentColor"
-            />
-            <path
-              fillRule="evenodd"
-              clipRule="evenodd"
-              d="M13.5005 23C13.3376 23 13.1791 22.9469 13.049 22.8487C12.9189 22.7505 12.8243 22.6127 12.7795 22.456L11.9665 19.61C11.7915 18.9971 11.4631 18.4389 11.0124 17.9882C10.5616 17.5374 10.0035 17.209 9.39054 17.034L6.54454 16.221C6.38795 16.1761 6.25021 16.0815 6.15216 15.9514C6.05411 15.8214 6.00108 15.6629 6.00108 15.5C6.00108 15.3371 6.05411 15.1786 6.15216 15.0486C6.25021 14.9185 6.38795 14.8239 6.54454 14.779L9.39054 13.966C10.0035 13.791 10.5616 13.4626 11.0124 13.0118C11.4631 12.5611 11.7915 12.0029 11.9665 11.39L12.7795 8.544C12.8244 8.38741 12.919 8.24967 13.0491 8.15162C13.1792 8.05357 13.3376 8.00054 13.5005 8.00054C13.6634 8.00054 13.8219 8.05357 13.952 8.15162C14.0821 8.24967 14.1767 8.38741 14.2215 8.544L15.0345 11.39C15.2096 12.0029 15.538 12.5611 15.9887 13.0118C16.4394 13.4626 16.9976 13.791 17.6105 13.966L20.4565 14.779C20.6131 14.8239 20.7509 14.9185 20.8489 15.0486C20.947 15.1786 21 15.3371 21 15.5C21 15.6629 20.947 15.8214 20.8489 15.9514C20.7509 16.0815 20.6131 16.1761 20.4565 16.221L17.6105 17.034C16.9976 17.209 16.4394 17.5374 15.9887 17.9882C15.538 18.4389 15.2096 18.9971 15.0345 19.61L14.2215 22.456C14.1768 22.6127 14.0822 22.7505 13.9521 22.8487C13.822 22.9469 13.6635 23 13.5005 23Z"
-              fill="currentColor"
-            />
-          </svg>
-          <input
-            id="targetInput"
-            className="search"
-            type="text"
-            value={query}
-            onChange={handleInputChange}
-            onFocus={onInputFocus}
-            onBlur={onInputBlur}
-            onKeyDown={handleKeyDown}
-            placeholder="Search..."
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck="false"
-            data-form-type="other"
-            data-lpignore="true"
-            data-1p-ignore="true"
-            data-bwignore="true"
-            role="combobox"
-            aria-expanded={isDropdownOpen}
-            aria-autocomplete="list"
-            aria-haspopup="listbox"
-          />
-          <button
-            type="button"
-            className="search-button"
-            onClick={() => handleSearch()}
-            aria-label="Search"
-          >
-            <FaSearch className="text-gray-500" color="grey" size={16} />
-          </button>
-        </div>
-
-        {/* Loading indicator */}
-        {isLoading && (
-          <div className="loading-indicator">
-            <span>Loading...</span>
-          </div>
+    <div className={`search-box ${isFocused ? "is-focused" : ""}`}>
+      <LiquidLens id="search-lens" target={capsuleRef} />
+      <div ref={capsuleRef} className="search-capsule glass" role="search">
+        <Search aria-hidden="true" />
+        <input
+          ref={inputRef}
+          id="targetInput"
+          className="search-input"
+          type="text"
+          value={query}
+          onChange={handleInputChange}
+          onFocus={onInputFocus}
+          onBlur={onInputBlur}
+          onKeyDown={handleKeyDown}
+          placeholder={arabic ? "Type Arabic in Latin letters: 3aslema…" : "Search or type a URL"}
+          dir="auto"
+          aria-label="Search shortcuts, events, news and the web"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck="false"
+          data-form-type="other"
+          data-lpignore="true"
+          data-1p-ignore="true"
+          data-bwignore="true"
+          role="combobox"
+          aria-expanded={Boolean(showResults)}
+          aria-autocomplete="list"
+          aria-controls="search-results"
+          aria-activedescendant={activeId}
+        />
+        {!query && !arabic && (
+          <kbd className="search-hint" aria-hidden="true">
+            /
+          </kbd>
         )}
-
-        {/* Error message */}
-        {error && (
-          <div className="error-message">
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="suggestionsContainer">
-          {isDropdownOpen && suggestions.length > 0 && (
-            <ul
-              className="suggestions-dropdown"
-              role="listbox"
-              aria-label="Search suggestions"
-            >
-              {suggestions.map((item, index) => {
-                const isHighlighted = index === highlightedIndex;
-                return (
-                  <li
-                    key={`${item}-${index}`}
-                    ref={(el) => (suggestionRefs.current[index] = el)}
-                    onClick={() => handleSuggestionClick(item)}
-                    onMouseEnter={() => setHighlightedIndex(index)}
-                    className={`suggestion-item ${isHighlighted ? "highlighted" : ""}`}
-                    style={{
-                      animationDelay: `${index * 0.02}s`,
-                    }}
-                    role="option"
-                    aria-selected={isHighlighted}
-                  >
-                    <span className="suggestion-icon">
-                      <FaSearch size={14} />
-                    </span>
-                    <span className="suggestion-text">{item}</span>
-                    {isHighlighted && (
-                      <span className="suggestion-shortcut">↵</span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
+        <button
+          type="button"
+          className="search-lang"
+          aria-pressed={arabic}
+          aria-label="Arabic typing"
+          title={
+            arabic
+              ? "Arabic typing is on: Space converts, Shift+Space keeps Latin"
+              : "Type Arabic in Latin letters (Arabizi)"
+          }
+          // Keep focus in the field so typing carries on
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            setArabic((on) => !on);
+            inputRef.current?.focus();
+          }}
+        >
+          ع
+        </button>
+        <button
+          type="button"
+          className={`search-go ${query.trim() ? "is-ready" : ""}`}
+          onClick={() => handleSearch()}
+          aria-label="Search the web"
+          tabIndex={query.trim() ? 0 : -1}
+        >
+          <ArrowUp aria-hidden="true" />
+        </button>
       </div>
-    </StyledWrapper>
+
+      {showResults && (
+        <div
+          id="search-results"
+          className="suggestions glass glass--thick"
+          role="listbox"
+          aria-label="Results"
+        >
+          {arabic && candidates && (
+            <div role="presentation">
+              <div className="results-group" role="presentation">
+                Arabic for “{candidates.word}”
+              </div>
+              <div className="ar-candidates" role="presentation">
+                {candidates.list.map((word, i) => (
+                  <button
+                    key={word}
+                    type="button"
+                    tabIndex={-1}
+                    lang="ar"
+                    dir="rtl"
+                    className={`ar-candidate ${i === 0 ? "is-default" : ""}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      replaceWord(candidates, word);
+                    }}
+                  >
+                    {word}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {results.map((r, index) => {
+            const isHighlighted = index === highlightedIndex;
+            const startsGroup = index === 0 || results[index - 1].group !== r.group;
+            return (
+              <div key={r.key} role="presentation">
+                {startsGroup && (
+                  <div className="results-group" role="presentation">
+                    {r.group}
+                  </div>
+                )}
+                <div
+                  id={`result-${index}`}
+                  ref={(el) => (suggestionRefs.current[index] = el)}
+                  // mousedown fires before the input blurs, so the pick lands
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    activate(r);
+                  }}
+                  onMouseEnter={() => setHighlightedIndex(index)}
+                  className={`suggestion ${isHighlighted ? "is-active" : ""} ${r.group === "Top hit" ? "is-top" : ""}`}
+                  role="option"
+                  aria-selected={isHighlighted}
+                >
+                  <span className="suggestion__icon">{resultIcon(r)}</span>
+                  <span className="suggestion__text">
+                    <span>{r.title}</span>
+                    {r.subtitle && <small>{r.subtitle}</small>}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 };
-
-const StyledWrapper = styled.div`
-  .dark-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-    z-index: -1;
-    cursor: pointer;
-  }
-
-  .search-container {
-    position: relative;
-    box-shadow:
-      0 20px 25px -5px rgb(0 0 0 / 0.15),
-      0 8px 10px -6px rgb(0 0 0 / 0.25);
-
-    background:
-      linear-gradient(canvas, canvas) padding-box,
-      linear-gradient(
-          120deg,
-          hsla(140, 93.4%, 12%, 0.69),
-          hsla(0, 0%, 25.5%, 0.06)
-        )
-        border-box;
-    border: 2px solid transparent;
-    border-radius: 18px;
-    transition: all 0.3s ease;
-  }
-
-  .search-container:focus-within {
-    box-shadow:
-      0 25px 35px -5px rgb(0 0 0 / 0.2),
-      0 10px 15px -6px rgb(0 0 0 / 0.3);
-    transform: translateY(-2px);
-  }
-
-  .input {
-    --icon-size: 28px;
-    position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-
-  .input .svgClass {
-    position: absolute;
-    width: var(--icon-size);
-    top: 50%;
-    left: 1rem;
-    transform: translateY(-50%);
-    overflow: visible;
-    color: color-mix(in lch, canvas, canvasText 30%);
-    transition: color 0.2s ease;
-  }
-
-  .input .svgClass path {
-    transform-box: fill-box;
-    transform-origin: center;
-    transition: all 0.3s ease;
-  }
-
-  .input:is(:hover, :focus-within) .svgClass {
-    color: color-mix(in lch, canvas, canvasText 50%);
-  }
-
-  .input:is(:hover, :focus-within) .svgClass path {
-    animation: pop 0.5s var(--d);
-  }
-
-  .input .svgClass path:nth-of-type(1) {
-    --d: 0.24s;
-    --r: 20deg;
-    --s: 1.5;
-  }
-  .input .svgClass path:nth-of-type(2) {
-    --d: 0.12s;
-    --r: 10deg;
-    --s: 1.4;
-  }
-  .input .svgClass path:nth-of-type(3) {
-    --d: 0s;
-    --r: 0deg;
-    --s: 1.25;
-  }
-
-  .search-button {
-    border: none;
-    background: transparent;
-    width: 50px;
-    cursor: pointer;
-    padding: 8px;
-  }
-
-  @keyframes pop {
-    50% {
-      scale: var(--s, 1);
-      rotate: var(--r, 0deg);
-    }
-  }
-
-  .search {
-    max-width: 800px;
-    padding: 1rem 3.5rem 1rem calc(1rem + var(--icon-size) + 0.5rem);
-    font-size: 1.025rem;
-    field-sizing: content;
-    border: 4px solid transparent;
-    border-radius: 18px;
-    outline: none;
-    width: auto;
-    min-width: 400px;
-    background: transparent;
-    transition: all 0.2s ease;
-    font-family: inherit;
-  }
-
-  .search::placeholder {
-    color: color-mix(in lch, canvas, canvasText 30%);
-    transition: color 0.2s ease;
-  }
-
-  .search:focus::placeholder {
-    color: color-mix(in lch, canvas, canvasText 20%);
-  }
-
-  .search:focus {
-    background: rgba(255, 255, 255, 0.05);
-  }
-
-  .suggestionsContainer {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    z-index: 1000;
-  }
-
-  .suggestions-dropdown {
-    margin: 8px 0 0 0;
-    min-width: 400px;
-    max-width: 800px;
-    max-height: 400px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    background: rgba(255, 255, 255, 0.98);
-    backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(226, 232, 240, 0.8);
-    border-radius: 16px;
-    box-shadow:
-      0 20px 25px -5px rgba(0, 0, 0, 0.12),
-      0 10px 10px -5px rgba(0, 0, 0, 0.06),
-      0 0 0 1px rgba(255, 255, 255, 0.5) inset;
-    font-size: 1rem;
-    list-style: none;
-    padding: 8px;
-    animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    scroll-behavior: smooth;
-  }
-
-  @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateY(-12px) scale(0.98);
-      filter: blur(4px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-      filter: blur(0);
-    }
-  }
-
-  .suggestions-dropdown .suggestion-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
-    margin: 2px 0;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    font-weight: 400;
-    color: #1f2937;
-    position: relative;
-    border-radius: 10px;
-    background: transparent;
-    border: 1px solid transparent;
-    animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .suggestions-dropdown .suggestion-item:hover {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 51, 234, 0.05) 100%);
-    border-color: rgba(59, 130, 246, 0.2);
-    transform: translateX(4px);
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
-  }
-
-  .suggestions-dropdown .suggestion-item.highlighted,
-  .suggestions-dropdown .suggestion-item[aria-selected="true"] {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(147, 51, 234, 0.08) 100%);
-    border-color: rgba(59, 130, 246, 0.3);
-    color: #1e40af;
-    transform: translateX(6px);
-    box-shadow: 
-      0 4px 12px rgba(59, 130, 246, 0.15),
-      0 0 0 2px rgba(59, 130, 246, 0.1) inset;
-    font-weight: 500;
-  }
-
-  .suggestions-dropdown .suggestion-item.highlighted::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 4px;
-    height: 60%;
-    background: linear-gradient(180deg, #3b82f6 0%, #9333ea 100%);
-    border-radius: 0 4px 4px 0;
-    box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
-  }
-
-  .suggestion-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: rgba(59, 130, 246, 0.1);
-    color: #3b82f6;
-    flex-shrink: 0;
-    transition: all 0.2s ease;
-  }
-
-  .suggestion-item.highlighted .suggestion-icon,
-  .suggestion-item[aria-selected="true"] .suggestion-icon {
-    background: linear-gradient(135deg, #3b82f6 0%, #9333ea 100%);
-    color: white;
-    transform: scale(1.1);
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-  }
-
-  .suggestion-text {
-    flex: 1;
-    font-size: 0.95rem;
-    line-height: 1.5;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .suggestion-shortcut {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 24px;
-    height: 24px;
-    padding: 0 8px;
-    border-radius: 6px;
-    background: rgba(59, 130, 246, 0.15);
-    color: #3b82f6;
-    font-size: 0.75rem;
-    font-weight: 600;
-    border: 1px solid rgba(59, 130, 246, 0.2);
-  }
-
-  .suggestions-dropdown .suggestion-item:first-child {
-    margin-top: 0;
-  }
-
-  .suggestions-dropdown .suggestion-item:last-child {
-    margin-bottom: 0;
-  }
-
-  .loading-indicator,
-  .error-message {
-    margin: 8px 0 0 0;
-    padding: 16px;
-    border-radius: 12px;
-    font-size: 0.9rem;
-    animation: fadeIn 0.25s ease-out;
-    text-align: center;
-    backdrop-filter: blur(10px);
-  }
-
-  .loading-indicator {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 51, 234, 0.05) 100%);
-    border: 1px solid rgba(59, 130, 246, 0.2);
-  }
-
-  .loading-indicator span {
-    font-size: 0.9rem;
-    color: #3b82f6;
-    font-weight: 500;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .loading-indicator span::before {
-    content: "";
-    width: 16px;
-    height: 16px;
-    border: 2px solid rgba(59, 130, 246, 0.3);
-    border-top-color: #3b82f6;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    display: inline-block;
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  .error-message {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.08) 100%);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-  }
-
-  .error-message span {
-    font-size: 0.9rem;
-    color: #dc2626;
-    font-weight: 500;
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-
-  /* Scrollbar styling for suggestions */
-  .suggestions-dropdown::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  .suggestions-dropdown::-webkit-scrollbar-track {
-    background: rgba(241, 245, 249, 0.5);
-    border-radius: 10px;
-    margin: 8px 0;
-  }
-
-  .suggestions-dropdown::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(59, 130, 246, 0.4) 0%, rgba(147, 51, 234, 0.4) 100%);
-    border-radius: 10px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-  }
-
-  .suggestions-dropdown::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, rgba(59, 130, 246, 0.6) 0%, rgba(147, 51, 234, 0.6) 100%);
-    background-clip: padding-box;
-  }
-
-  /* Responsive design */
-  @media (max-width: 768px) {
-    .search {
-      min-width: 280px;
-      font-size: 1rem;
-    }
-
-    .suggestions-dropdown {
-      min-width: 280px;
-    }
-  }
-`;
 
 export default SearchBar;

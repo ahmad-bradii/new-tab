@@ -1,432 +1,1931 @@
-* {
-  font-family: "Roboto";
+/* ==========================================================================
+   Liquid Glass new tab
+   One material, several thicknesses. The wallpaper is the colour; glass only
+   bends and frosts it. Refraction is reserved for the search capsule.
+   ========================================================================== */
+
+:root {
+  --font:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter",
+    system-ui, "Segoe UI", sans-serif;
+
+  /* Ink — light glass (set on wallpapers the analyser reads as bright) */
+  --ink: #1d1d1f;
+  --ink-2: rgba(60, 60, 67, 0.64);
+  --ink-3: rgba(60, 60, 67, 0.32);
+  --hairline: rgba(60, 60, 67, 0.14);
+
+  /* Glass fills: regular for widgets, thick for sheets that hold forms */
+  --glass-fill: rgba(255, 255, 255, 0.22);
+  --glass-sheen: rgba(255, 255, 255, 0.14);
+  --glass-thick: rgba(246, 246, 250, 0.68);
+  --glass-press: rgba(255, 255, 255, 0.34);
+  --field-fill: rgba(118, 118, 128, 0.12);
+
+  /* Specular rim: bright top edge, faint base edge, a half-pixel outline */
+  --rim:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0.5px rgba(255, 255, 255, 0.16),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.34);
+  --lift:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 14px 40px -12px rgba(0, 0, 0, 0.28);
+
+  /* System colours, used sparingly */
+  --tint: #0a84ff;
+  --tint-ink: #ffffff;
+  --danger: #ff3b30;
+  --second-hand: #ff9f0a;
+
+  --blur: 22px;
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Radii by role, not one radius for everything */
+  --r-capsule: 999px;
+  --r-sheet: 34px;
+  --r-widget: 28px;
+  --r-icon: 18px;
+  --r-row: 14px;
+
+  color-scheme: light;
 }
+
+:root[data-glass="dark"] {
+  --ink: #f5f5f7;
+  --ink-2: rgba(235, 235, 245, 0.66);
+  --ink-3: rgba(235, 235, 245, 0.32);
+  --hairline: rgba(235, 235, 245, 0.14);
+
+  /* Dense enough to read as one dark material over bright parts of the
+     wallpaper too, instead of a muddy grey */
+  --glass-fill: rgba(22, 22, 26, 0.56);
+  --glass-sheen: rgba(255, 255, 255, 0.05);
+  --glass-thick: rgba(30, 30, 34, 0.7);
+  --glass-press: rgba(60, 60, 66, 0.4);
+  --field-fill: rgba(118, 118, 128, 0.24);
+  --danger: #ff453a;
+
+  --rim:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0.5px rgba(255, 255, 255, 0.06),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+  --lift:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 18px 48px -12px rgba(0, 0, 0, 0.55);
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
 body {
-  background-image: url("./44.jpg");
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-attachment: fixed; /* Ensures the background stays fixed during scrolling */
-  /* background-position: center; Centers the background image */
-  margin: 0; /* Removes default margin */
-  padding: 0; /* Removes default padding */
-  margin: 0 20px;
-}
-.routeContainer {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  grid-template-rows: 0.7fr, 1fr, 1fr;
-  gap: 1rem;
-  justify-content: center;
-  align-items: center;
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  /* Fallback until the chosen wallpaper is applied from script */
+  background: #6d7f8c url("./11.jpg") center / cover no-repeat fixed;
 }
 
-.inputContainer {
-  grid-column: 1/6;
-  grid-row: 3;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-.headerContainer {
-  grid-column: 1/6;
-}
-.iconsContainer {
-  grid-column: 2/6;
-  grid-row: 2;
-}
-/* @Horloge */
-
-.delte-edit-tab:hover {
-  background-color: #5f6368;
+button,
+input {
+  font: inherit;
+  color: inherit;
 }
 
-.clock-dial {
-  background-image: url("/Star 64.svg");
-  background-size: cover;
-  background-position: center;
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
+a {
+  color: inherit;
+  text-decoration: none;
+}
 
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--tint) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------- The material ---------- */
+
+.glass {
+  background-color: var(--glass-fill);
+  background-image: linear-gradient(
+    to bottom,
+    var(--glass-sheen),
+    transparent 42%
+  );
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+  backdrop-filter: blur(var(--blur)) saturate(180%);
+  box-shadow: var(--rim), var(--lift);
+}
+
+.glass--thick {
+  background-color: var(--glass-thick);
+  --blur: 40px;
+}
+
+/* ---------- Page ---------- */
+
+.page {
   position: relative;
-  display: grid;
+  /* Stops the first child's top margin collapsing through the page, which
+     would shift the shortcut layer away from where tiles are measured */
+  display: flow-root;
+  min-height: 100vh;
+  isolation: isolate;
+}
 
-  grid-template-columns: 1fr 1fr 1fr;
-  grid-template-rows: 1fr 1fr 1fr;
-  justify-items: center;
-  gap: 10px;
+/* The one orchestrated moment: glass condenses out of the wallpaper */
+@keyframes condense {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+.page > .columns,
+.page > .top-bar,
+.page > .search-slot {
+  /* backwards, not both: a filter held after the animation would turn these
+     into backdrop roots and stop their popovers frosting the page */
+  animation: condense 700ms var(--ease-spring) backwards;
+}
+.page > .search-slot {
+  animation-delay: 60ms;
+}
+.page > .top-bar {
+  animation-delay: 120ms;
+}
+
+.page.is-searching .columns,
+.page.is-searching .top-bar,
+.page.is-searching .desktop {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.columns,
+.top-bar,
+.desktop {
+  transition: opacity 280ms var(--ease-spring);
+}
+
+/* ---------- Top bar ---------- */
+
+.top-bar {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 20;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--r-capsule);
+}
+
+/* The bar's glass lives on a pseudo-element. If the bar itself had a
+   backdrop-filter, its popovers could only frost the bar, not the page. */
+.top-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background-color: var(--glass-fill);
+  background-image: linear-gradient(
+    to bottom,
+    var(--glass-sheen),
+    transparent 42%
+  );
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+  backdrop-filter: blur(var(--blur)) saturate(180%);
+  box-shadow: var(--rim), var(--lift);
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-capsule);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    transform 160ms var(--ease-spring);
+}
+
+.icon-button:hover {
+  background: var(--glass-press);
+}
+
+.icon-button:active {
+  transform: scale(0.92);
+}
+
+.icon-button[aria-expanded="true"] {
+  background: var(--glass-press);
+}
+
+.icon-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.apps-launcher {
+  position: relative;
+}
+
+.apps-popover {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: -4px;
+  width: 312px;
+  padding: 10px;
+  border-radius: var(--r-widget);
+  transform-origin: top right;
+  animation: pop-open 260ms var(--ease-spring);
+}
+
+@keyframes pop-open {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
   margin: 0;
   padding: 0;
-}
-.second-hand,
-.hour-hand,
-.minute-hand {
-  grid-column: 1;
-  grid-row: 1;
-
-  width: 5px;
-  height: 100%;
-  /* background-color: #e1f6e7; */
-  position: absolute;
+  list-style: none;
 }
 
-.hand-pointer {
-  width: 22px;
-
-  border-radius: 18px;
-  position: absolute;
-}
-#second {
-  background-color: rgb(25, 42, 68);
-  width: 100%;
-  height: 5%;
-  margin-top: 200%;
-}
-#minute {
-  background-color: #3a8660;
-  width: 5px;
-  height: 30%;
-  margin-top: 450%;
-}
-#hour {
-  background-color: #3b4b41;
-  width: 5px;
-  height: 20%;
-  margin-top: 630%;
-}
-
-/* @date  */
-
-.container {
-  font-family:
-    ui-rounded,
-    "SF Pro Rounded",
-    "Nunito",
-    -apple-system,
-    BlinkMacSystemFont,
-    sans-serif;
-  font-weight: 600;
-  width: 100%;
-  max-width: 350px;
-
-  grid-row: 2;
-  grid-column: 1;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Weather widget layout */
-.weather-widget {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto;
-  gap: 10px;
-
-  grid-template-areas:
-    "time date"
-    "weather weather";
-}
-
-/* Card styles */
-.card {
-  background-color: #c7d8d879;
-  border-radius: 20px;
-  padding: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  color: #184113;
-}
-
-/* Time card */
-.time-card {
-  grid-area: time;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-@font-face {
-  font-family: "SF Pro Rounded";
-  src: local("SF Pro Rounded");
-}
-
-@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@500;600&display=swap");
-
-.time {
-  font-family:
-    ui-rounded,
-    "SF Pro Rounded",
-    "Nunito",
-    -apple-system,
-    BlinkMacSystemFont,
-    sans-serif;
-  font-size: 54px;
-  font-weight: 600;
-  letter-spacing: -0.5px;
-}
-
-/* Date card */
-.date-card {
-  grid-area: date;
-  background-color: #c9f1f1b4;
-  color: #ffffff;
+.app-item {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
+  gap: 8px;
+  padding: 14px 6px 12px;
+  border-radius: var(--r-row);
+  font-size: 13px;
+  color: var(--ink);
+  transition: background-color 140ms ease;
 }
 
-.day {
-  font-size: 20px;
-  margin-bottom: 4px;
+.app-item:hover {
+  background: var(--glass-press);
 }
-.day :nth-child(1) {
-  color: #0abb54;
+
+.app-item img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
 }
-.date {
-  font-size: 50px;
-  font-weight: 700;
+
+/* ---------- Widgets ---------- */
+
+/* Clock, date and prayer on the left; events and news on the right */
+.columns {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.columns > * {
+  pointer-events: auto;
+}
+
+/* Upcoming takes what it needs; News fills the rest of the screen height
+   and scrolls inside itself */
+.side-widgets {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 344px;
+  min-width: 0;
+  max-height: calc(100vh - 112px);
+  margin-top: 64px;
+}
+
+.side-widgets > * {
+  flex: none;
+  min-width: 0;
+}
+
+.side-widgets > .widget--news {
+  flex: 0 1 auto;
+  min-height: 240px;
+}
+
+.widgets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  width: 344px;
+}
+
+.widget {
+  position: relative;
+  border-radius: var(--r-widget);
+  padding: 16px;
+  color: var(--ink);
+}
+
+.widget--clock,
+.widget--date {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.widget--prayer {
+  grid-column: 1 / -1;
+  padding: 18px 20px 14px;
+}
+
+.widget-switch {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Clock */
+
+.clock-face {
+  position: relative;
+  width: 132px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+}
+
+/* Hour ticks: a conic gradient masked down to a thin outer ring */
+.clock-ticks {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from -1.2deg,
+    var(--ink-2) 0deg 2.4deg,
+    transparent 2.4deg 30deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 56px, #000 57px);
+  mask: radial-gradient(circle, transparent 56px, #000 57px);
+}
+
+.clock-hand {
+  position: absolute;
+  animation: clock-spin var(--period, 60s) linear infinite;
+  left: 50%;
+  bottom: 50%;
+  transform-origin: 50% 100%;
+  border-radius: 4px;
+  background: var(--ink);
+}
+
+.clock-hand--hour {
+  width: 5px;
+  height: 32%;
+  margin-left: -2.5px;
+}
+
+.clock-hand--minute {
+  width: 4px;
+  height: 42%;
+  margin-left: -2px;
+}
+
+.clock-hand--second {
+  width: 1.5px;
+  height: 46%;
+  margin-left: -0.75px;
+  background: var(--second-hand);
+}
+
+.clock-cap {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: var(--second-hand);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+.digital-time {
+  font-size: 44px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
-/* Weather card */
-.weather-card {
-  grid-area: weather;
-  padding: 20px;
+.widget--clock.shows-both {
+  gap: 8px;
+  align-content: center;
 }
 
-.location {
-  font-size: 12px;
-  width: 40%;
-  margin-bottom: 5px;
-  color: #1c4b30;
+.widget--clock.shows-both .clock-face {
+  width: 92px;
 }
 
-.temperature {
-  font-size: 30px;
-  font-weight: 700;
-  margin-bottom: 10px;
-  color: #1c4b30;
+.widget--clock.shows-both .clock-ticks {
+  -webkit-mask: radial-gradient(circle, transparent 39px, #000 40px);
+  mask: radial-gradient(circle, transparent 39px, #000 40px);
 }
 
-.weather-info {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 20px;
+.widget--clock.shows-both .digital-time {
+  font-size: 22px;
 }
 
-.condition {
-  display: flex;
-  align-items: center;
-}
-
-.condition i {
-  margin-right: 5px;
-  color: #ffcc00;
-}
-
-.temp-range {
-  font-size: 14px;
-}
-
-/* Hourly forecast */
-.hourly-forecast {
-  display: flex;
-  justify-content: space-between;
-  border-top: 1px solid rgba(115, 93, 133, 0.2);
-  padding-top: 15px;
-}
-
-.hour-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 4px;
-}
-
-.hour-item i {
-  margin-bottom: 5px;
-  font-size: 10px;
-}
-
-.hour-item i.fa-sun {
-  color: #ffcc00;
-}
-
-.hour-item i.fa-moon {
-  color: #9f94b0;
-}
-
-.hour-item span {
-  font-size: 14px;
-}
-
-/* Responsive adjustments */
-@media (max-width: 480px) {
-  .weather-widget {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "time"
-      "date"
-      "weather";
+@keyframes clock-spin {
+  from {
+    rotate: 0deg;
   }
-
-  .time,
-  .date {
-    text-align: center;
-    align-items: center;
-    flex-direction: column;
-  }
-
-  .hourly-forecast {
-    overflow-x: auto;
-    padding-bottom: 10px;
-  }
-
-  .hour-item {
-    margin-right: 20px;
-    min-width: 40px;
+  to {
+    rotate: 360deg;
   }
 }
 
-.weather-location-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-}
-.count-down {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 28px;
-  font-size: 20px;
-  grid-column: 2;
-  grid-row: 1/3;
-  color: rgb(38, 22, 46);
-}
-.location {
-  grid-column: 1;
-}
+/* Calendar */
 
-/* @google items */
-.app-menu-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center; /* Center content vertically */
-  text-decoration: none;
-  color: #202124; /* Dark text color */
-  padding: 12px 8px; /* Adjust padding */
-  border-radius: 8px; /* Rounded corners for hover effect */
-  transition: background-color 0.2s ease-in-out;
+.widget--date {
+  align-content: center;
+  gap: 2px;
   text-align: center;
-  min-height: 80px; /* Ensure items have a minimum height */
-  box-sizing: border-box;
 }
 
-.app-menu-item:hover {
-  background-color: rgba(60, 64, 67, 0.08); /* Light grey hover */
+.date-weekday {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--danger);
 }
 
-.app-icon {
-  width: 48px; /* Adjust icon size */
-  height: 48px;
+.date-day {
+  font-size: 72px;
+  font-weight: 300;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.date-month {
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+/* Prayer times */
+
+.prayer-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.prayer-city {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.prayer-next {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.prayer-next strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.prayer-list {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prayer-list li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  border-radius: var(--r-row);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.prayer-list time {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.prayer-list li.is-next {
+  background: var(--glass-press);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.prayer-status {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* ---------- Search ---------- */
+
+.search-slot {
+  position: absolute;
+  top: 34vh;
+  left: 50%;
+  z-index: 30;
+  width: min(640px, calc(100vw - 2 * 392px));
+  translate: -50% 0;
+  transition: top 420ms var(--ease-spring);
+}
+
+.page.is-searching .search-slot {
+  top: 20vh;
+  width: min(680px, calc(100vw - 32px));
+}
+
+/* macOS Spotlight: the whole desktop sinks back into a deep, dim blur */
+.search-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  border: 0;
+  background:
+    radial-gradient(
+      ellipse 70% 60% at 50% 30%,
+      rgba(0, 0, 0, 0.12),
+      rgba(0, 0, 0, 0.42)
+    );
+  -webkit-backdrop-filter: blur(44px) saturate(160%) brightness(0.92);
+  backdrop-filter: blur(44px) saturate(160%) brightness(0.92);
+  cursor: default;
+  animation: fade-in 260ms ease both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.search-capsule {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 60px;
+  padding: 0 8px 0 22px;
+  border-radius: var(--r-capsule);
+  transition:
+    transform 320ms var(--ease-spring),
+    box-shadow 320ms ease;
+}
+
+/* Chromium can refract the backdrop through an SVG displacement map */
+.has-lens .search-capsule {
+  background-color: var(--glass-fill);
+  -webkit-backdrop-filter: url(#search-lens) blur(3px) saturate(190%);
+  backdrop-filter: url(#search-lens) blur(3px) saturate(190%);
+}
+
+.search-capsule:focus-within {
+  transform: scale(1.015);
+}
+
+.search-capsule > svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--ink-2);
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.search-input::placeholder {
+  color: var(--ink-2);
+}
+
+/* Arabic typing toggle: a quiet letter that lights up when on */
+.search-lang {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-right: 4px;
+  padding: 0 0 3px;
+  border: 0;
+  border-radius: var(--r-capsule);
+  background: transparent;
+  font: 600 19px/1 var(--font);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.search-lang:hover {
+  background: var(--field-fill);
+  color: var(--ink);
+}
+
+.search-lang[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--tint) 18%, transparent);
+  color: var(--tint);
+}
+
+.ar-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 10px 8px;
+}
+
+.ar-candidate {
+  min-width: 48px;
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-capsule);
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  font-size: 18px;
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.ar-candidate:hover {
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+}
+
+.ar-candidate.is-default {
+  background: var(--tint);
+  color: var(--tint-ink);
+}
+
+.search-go {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-capsule);
+  background: var(--tint);
+  color: var(--tint-ink);
+  cursor: pointer;
+  opacity: 0;
+  scale: 0.6;
+  pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    scale 260ms var(--ease-spring);
+}
+
+.search-go.is-ready {
+  opacity: 1;
+  scale: 1;
+  pointer-events: auto;
+}
+
+.search-go svg {
+  width: 18px;
+  height: 18px;
+}
+
+.suggestions {
+  margin: 10px 0 0;
+  padding: 6px;
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
+  list-style: none;
+  border-radius: var(--r-widget);
+  transform-origin: top center;
+  animation: pop-open 240ms var(--ease-spring);
+}
+
+.suggestion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: var(--r-row);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.suggestion__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--field-fill);
+  color: var(--ink-2);
+}
+
+.suggestion__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.suggestion__icon img {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
   object-fit: contain;
-  margin-bottom: 6px; /* Space between icon and label */
 }
 
-.app-label {
-  font-size: 14px; /* Slightly larger font */
-  line-height: 1.2;
-  white-space: nowrap;
+.suggestion.is-top .suggestion__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.suggestion.is-top .suggestion__icon img {
+  width: 28px;
+  height: 28px;
+}
+
+.suggestion.is-top .suggestion__text > span {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.suggestion__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.suggestion__text > * {
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 80px; /* Limit width to prevent awkward wrapping */
-}
-.google-apps-menu-container {
-  /* If you want to position this like a dropdown, you'd add
-     position: absolute; top: ...; right: ...; etc.
-     Here we just style the container itself. */
-  padding: 8px; /* Padding around the grid */
-  background-color: #ffffff; /* White background */
-  border-radius: 16px; /* More rounded corners for the panel */
-  box-shadow:
-    0 4px 8px rgba(0, 0, 0, 0.1),
-    0 1px 3px rgba(0, 0, 0, 0.08); /* Add shadow */
-  border: 7px solid #dadce0;
-  width: 320px; /* Fixed width for the panel */
-  box-sizing: border-box;
+  white-space: nowrap;
 }
 
-.google-apps-menu {
-  display: grid;
-  /* Create 3 equal columns */
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px; /* Small gap between grid items */
-}
-.apps-launcher-wrapper {
-  position: relative; /* Establishes positioning context for the absolute menu */
-  display: inline-block; /* Or block, depending on layout */
-}
-.headerContainer {
-  display: grid;
-  grid-template-columns: 2fr 0.2fr;
+.suggestion__text small {
+  font-size: 13px;
+  color: var(--ink-2);
 }
 
-.apps-launcher-button {
-  background: none;
-  border: none;
-  padding: 8px; /* Adjust padding as needed */
-  border-radius: 50%;
+.suggestion.is-active {
+  background: var(--tint);
+  color: var(--tint-ink);
+}
+
+.suggestion.is-active small,
+.suggestion.is-active .suggestion__icon {
+  color: inherit;
+}
+
+.suggestion.is-active .suggestion__icon {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.results-group {
+  padding: 10px 14px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.results-group:first-child {
+  padding-top: 4px;
+}
+
+.search-hint {
+  flex: none;
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  margin-right: 10px;
+  border-radius: 7px;
+  background: var(--field-fill);
+  font: 500 14px var(--font);
+  color: var(--ink-2);
+}
+
+/* ---------- Side widgets: upcoming and news ---------- */
+
+.widget--agenda,
+.widget--news {
+  padding: 16px 18px;
+}
+
+.widget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.widget-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.widget-head .widget-title {
+  margin: 0;
+}
+
+.widget-status {
+  margin: 4px 0 2px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.widget-empty p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.agenda-day + .agenda-day {
+  margin-top: 10px;
+}
+
+.agenda-day h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.agenda-day ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agenda-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 10px;
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid var(--tint);
+  font-size: 14px;
+}
+
+.agenda-item__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.agenda-item__time {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.agenda-item__place {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.agenda-item.is-live {
+  border-left-color: #30d158;
+}
+
+.agenda-item.is-live .agenda-item__time {
+  color: #30d158;
+  font-weight: 600;
+}
+
+/* Topic chips wrap rather than scroll: every topic stays in view, and the
+   row is never a scroll container that the list below can squeeze */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  flex: none;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-capsule);
+  /* Tinted from the ink so it reads on any glass, light or dark */
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  display: flex; /* Align icon inside button */
+  transition: background-color 160ms ease;
+}
+
+.chip:hover {
+  background: var(--glass-press);
+}
+
+.chip.is-selected {
+  background: var(--tint);
+  color: var(--tint-ink);
+}
+
+.settings__topics {
+  margin-top: 8px;
+}
+
+.widget--news {
+  display: flex;
+  flex-direction: column;
+}
+
+.widget--news > .widget-head,
+.widget--news > .chips {
+  flex: none;
+}
+
+.headlines-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 12px -10px -6px;
+  padding: 0 2px 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-3) transparent;
+  /* Soft fade where stories scroll out of view */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+
+.headlines-scroll:focus-visible {
+  outline-offset: -3px;
+}
+
+.headlines {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.headlines-more,
+.headlines-end {
+  margin: 0;
+  padding: 10px 8px 22px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.headlines-end a {
+  color: var(--tint);
+  font-weight: 500;
+}
+
+.headline {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: var(--r-row);
+  transition: background-color 140ms ease;
+}
+
+.headline:hover {
+  background: var(--glass-press);
+}
+
+.headline__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.headline__meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.icon-button--small {
+  width: 30px;
+  height: 30px;
+}
+
+.icon-button--small svg {
+  width: 16px;
+  height: 16px;
+}
+
+.is-spinning {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* ---------- Notification centre ---------- */
+
+.icon-button {
+  position: relative;
+}
+
+.badge {
+  position: absolute;
+  top: 3px;
+  right: 2px;
+  display: grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: var(--r-capsule);
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Anchored to the whole top bar so it never runs off a narrow screen */
+.notices {
+  right: 0;
+  width: 360px;
+  max-height: min(620px, calc(100vh - 100px));
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.notices section + section {
+  margin-top: 14px;
+}
+
+.notices h3 {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.notices__count {
+  font-weight: 500;
+}
+
+.notice-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notice {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--r-row);
+  background: var(--field-fill);
+  font-size: 14px;
+  transition: background-color 140ms ease;
+}
+
+a.notice:hover {
+  background: var(--glass-press);
+}
+
+.notice__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.notice__top strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.notice__top time {
+  flex: none;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.notice__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice__body {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+.notice--event {
+  border-left: 3px solid var(--tint);
+}
+
+.notice-empty {
+  margin: 0 4px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.messaging {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.messaging .app-item {
+  padding: 10px 2px;
+  font-size: 11.5px;
+}
+
+.messaging .app-item img {
+  width: 28px;
+  height: 28px;
+}
+
+/* ---------- Shortcuts: free-floating tiles ---------- */
+
+.desktop {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.tile {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 88px;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  will-change: transform;
+}
+
+/* Where a dragged tile will land: an empty icon-sized well */
+.tile-slot {
+  position: absolute;
+  top: 4px;
+  left: 12px;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-icon);
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 30%, transparent);
+  pointer-events: none;
+  transition: transform 180ms var(--ease-spring);
+}
+
+.tile.is-settling {
+  transition: transform 360ms var(--ease-spring);
+}
+
+.tile__link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 0;
+  border-radius: var(--r-icon);
+  cursor: default;
+  -webkit-user-drag: none;
+}
+
+.tile__icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-icon);
+  transition:
+    transform 260ms var(--ease-spring),
+    box-shadow 260ms ease;
+}
+
+.tile__icon img,
+.tile__icon .tile__fallback {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: contain;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.tile__fallback {
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tile__label {
+  max-width: 100%;
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #fff;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.7),
+    0 0 10px rgba(0, 0, 0, 0.45);
+}
+
+.tile:hover .tile__icon {
+  transform: scale(1.06);
+}
+
+.tile__link:active .tile__icon {
+  transform: scale(0.94);
+}
+
+.tile.is-dragging {
+  z-index: 1;
+  cursor: grabbing;
+}
+
+.tile.is-dragging .tile__icon {
+  transform: scale(1.14);
+  box-shadow:
+    var(--rim),
+    0 24px 50px -10px rgba(0, 0, 0, 0.45);
+}
+
+.tile__edit {
+  position: absolute;
+  top: -2px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--ink);
+  cursor: pointer;
+  opacity: 0;
+  scale: 0.6;
+  transition:
+    opacity 160ms ease,
+    scale 220ms var(--ease-spring);
+}
+
+.tile__edit svg {
+  width: 13px;
+  height: 13px;
+}
+
+.tile:hover .tile__edit,
+.tile:focus-within .tile__edit {
+  opacity: 1;
+  scale: 1;
+}
+
+.tile.is-dragging .tile__edit {
+  opacity: 0;
+}
+
+.empty-hint {
+  position: absolute;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 10px 10px 20px;
+  border-radius: var(--r-capsule);
+  font-size: 15px;
+  translate: -50% 0;
+}
+
+/* ---------- Buttons ---------- */
+
+.button {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s ease-in-out;
-  grid-column: 3;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--r-capsule);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 160ms var(--ease-spring),
+    filter 160ms ease;
 }
 
-.apps-launcher-button:hover {
-  background-color: rgba(
-    60,
-    64,
-    67,
-    0.08
-  ); /* Similar hover to other Google elements */
+.button:active {
+  transform: scale(0.96);
 }
 
-.apps-launcher-button svg {
-  fill: #5f6368; /* Icon color */
+.button--primary {
+  background: var(--tint);
+  color: var(--tint-ink);
 }
 
-/* This is the absolutely positioned container for the menu */
-.apps-menu-popover {
-  position: absolute;
-  top: calc(100% + 4px); /* Position below the button with a small gap */
-  right: 0; /* Align to the right edge of the wrapper */
-  z-index: 100; /* Ensure it appears above other content */
+.button--primary:hover {
+  filter: brightness(1.08);
 }
 
-/* --- Modify GoogleAppsMenu.css --- */
-/* Remove positioning/container styles if they were previously in GoogleAppsMenu.css */
-/* .google-apps-menu-container { ... } -> These styles are now in .apps-menu-popover */
+.button--plain {
+  background: var(--field-fill);
+  color: var(--ink);
+}
 
-/* Keep the grid styles for the menu itself */
-/* src/GoogleAppsMenu.css (ensure these styles remain) */
-.google-apps-menu {
+.button--danger {
+  background: transparent;
+  color: var(--danger);
+}
+
+.button--danger:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.button--small {
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+/* ---------- Sheet (add / edit shortcut) ---------- */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-}
-.app-header {
-  right: 50%;
-}
-.apps-launcher-wrapper {
-  grid-column: 3;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.22);
+  /* Animate the colour, not opacity: an opacity animation here would make
+     this a backdrop root and stop the sheet from frosting the page */
+  animation: scrim-in 200ms ease;
 }
 
-/* end google */
+@keyframes scrim-in {
+  from {
+    background-color: transparent;
+  }
+}
 
-a {
-  text-decoration: none;
-  color: #202124;
+.sheet {
+  width: min(400px, 100%);
+  padding: 26px 22px 20px;
+  border-radius: var(--r-sheet);
+  color: var(--ink);
+  animation: sheet-in 380ms var(--ease-spring) both;
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+}
+
+.sheet h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.sheet-intro {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  text-align: center;
+}
+
+.field-group {
+  margin-bottom: 8px;
+  border-radius: var(--r-row);
+  background: var(--field-fill);
+  overflow: hidden;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 16px;
+}
+
+.field + .field {
+  border-top: 0.5px solid var(--hairline);
+}
+
+.field label {
+  flex: none;
+  width: 52px;
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.field input {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 16px;
+}
+
+.field input::placeholder {
+  color: var(--ink-3);
+}
+
+.field:focus-within {
+  box-shadow: inset 3px 0 0 var(--tint);
+}
+
+.form-error {
+  margin: 8px 4px 0;
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.sheet-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.sheet-delete {
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* ---------- Settings panel ---------- */
+
+.settings {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(360px, calc(100vw - 24px));
+  border-radius: var(--r-sheet);
+  color: var(--ink);
+  animation: settings-in 420ms var(--ease-spring) both;
+}
+
+@keyframes settings-in {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+}
+
+.settings__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 14px 6px 24px;
+}
+
+.settings__head h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.settings__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 16px 20px;
+}
+
+.settings__section {
+  margin: 0 0 22px;
+  padding: 0;
+  border: 0;
+}
+
+.settings__section > h3,
+.settings__section > legend {
+  margin: 0 0 8px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.settings__group {
+  border-radius: var(--r-row);
+  background: var(--field-fill);
+}
+
+.settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 8px 8px 16px;
+  font-size: 15px;
+}
+
+.settings__row + .settings__row {
+  border-top: 0.5px solid var(--hairline);
+}
+
+.settings__row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 15px;
+}
+
+.settings__hint {
+  margin: 8px 8px 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--field-fill);
+}
+
+.segmented label {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented label:has(input:checked) {
+  background: var(--glass-thick);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+.segmented--compact {
+  margin-bottom: 2px;
+}
+
+.segmented > button {
+  min-height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.segmented > button.is-selected {
+  background: var(--glass-thick);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.settings__row select {
+  max-width: 60%;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--field-fill);
+  font-size: 14px;
+}
+
+/* iOS-style switch built on a checkbox */
+.switch {
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: 51px;
+  height: 31px;
+  margin: 0;
+  border-radius: var(--r-capsule);
+  background: var(--field-fill);
+  cursor: pointer;
+  transition: background-color 200ms ease;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: translate 260ms var(--ease-spring);
+}
+
+.switch:checked {
+  background: #34c759;
+}
+
+.switch:checked::after {
+  translate: 20px 0;
+}
+
+.segmented label:has(input:focus-visible) {
+  outline: 3px solid color-mix(in srgb, var(--tint) 70%, transparent);
+}
+
+.wallpaper-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-row);
+  background: center / cover no-repeat;
+  box-shadow: inset 0 0 0 0.5px var(--hairline);
+}
+
+.wallpaper-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.file-button input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.file-button:has(input:focus-visible) {
+  outline: 3px solid color-mix(in srgb, var(--tint) 70%, transparent);
+}
+
+/* ---------- Toast ---------- */
+
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: var(--r-capsule);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  translate: -50% 0;
+  animation: toast-in 420ms var(--ease-spring) both;
+}
+
+.toast svg {
+  width: 18px;
+  height: 18px;
+}
+
+.toast--success svg {
+  color: #30d158;
+}
+
+.toast--error svg {
+  color: var(--danger);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.9);
+  }
+}
+
+/* ---------- Small screens: stack widgets, search, then tiles ---------- */
+
+@media (max-width: 1199px) {
+  /* Search comes first; widgets sit below the shortcut grid, whose height
+     the page passes in as --tiles-space */
+  .columns {
+    position: relative;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+    margin-top: calc(var(--tiles-space, 0px) + 28px);
+    padding: 0 16px 32px;
+  }
+
+  .widgets,
+  .side-widgets {
+    width: min(344px, 100%);
+    max-height: none;
+    margin-top: 0;
+  }
+
+  .side-widgets > .widget--news {
+    max-height: 560px;
+  }
+
+  .search-slot,
+  .page.is-searching .search-slot {
+    width: min(640px, calc(100vw - 32px));
+  }
+
+  .notices {
+    width: min(360px, calc(100vw - 32px));
+  }
+
+  .search-slot {
+    position: relative;
+    top: auto;
+    left: auto;
+    margin: 84px auto 0;
+    translate: none;
+  }
+
+  .page.is-searching .search-slot {
+    top: auto;
+  }
+
+  .top-bar {
+    top: 16px;
+    right: 16px;
+  }
+}
+
+/* Phones: search, shortcut grid and widgets share one column width. 400px
+   is exactly four shortcut cells, so the tiles line up with both edges. */
+@media (max-width: 759px) {
+  .search-slot,
+  .page.is-searching .search-slot,
+  .widgets,
+  .side-widgets {
+    width: min(400px, calc(100vw - 32px));
+  }
+}
+
+@media (max-width: 380px) {
+  .clock-face {
+    width: 108px;
+  }
+
+  .clock-ticks {
+    -webkit-mask: radial-gradient(circle, transparent 45px, #000 46px);
+    mask: radial-gradient(circle, transparent 45px, #000 46px);
+  }
+
+  .date-day {
+    font-size: 58px;
+  }
+}
+
+/* ---------- Accessibility preferences ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+
+  /* The hands are information, not decoration: keep them telling time */
+  .clock-hand {
+    animation-duration: var(--period) !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .has-lens .search-capsule {
+    background-color: var(--glass-thick);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }

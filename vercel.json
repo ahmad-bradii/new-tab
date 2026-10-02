@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://search-api-r2w3.onrender.com/api/$1"
+      "source": "/api/suggestions(.*)",
+      "destination": "https://search-api-r2w3.onrender.com/api/suggestions$1"
     }
   ]
 }

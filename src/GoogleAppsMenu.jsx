@@ -1,7 +1,7 @@
 import AppMenuItem from "./AppMenuItem";
 
 // Sample Data - Now with actual URLs
-const appsData = [
+export const appsData = [
   {
     id: "account",
     label: "Account",
@@ -86,19 +86,13 @@ const appsData = [
 
 function GoogleAppsMenu() {
   return (
-    <div className="google-apps-menu-container">
-      <div className="google-apps-menu">
-        {appsData.map((app) => (
-          <AppMenuItem
-            key={app.id}
-            iconSrc={app.iconSrc}
-            label={app.label}
-            url={app.url}
-          />
-        ))}
-        {/* You could add a "More from Google" link here */}
-      </div>
-    </div>
+    <ul className="apps-grid">
+      {appsData.map((app) => (
+        <li key={app.id}>
+          <AppMenuItem iconSrc={app.iconSrc} label={app.label} url={app.url} />
+        </li>
+      ))}
+    </ul>
   );
 }
 

@@ -1,606 +1,329 @@
-import { useState, useEffect, memo, useCallback, useMemo } from "react";
-import styled from "styled-components";
-import { HiMiniArrowLongRight } from "react-icons/hi2";
-import { GrClearOption } from "react-icons/gr";
-// Styled Components with Performance Optimizations
-const SettingsContainer = styled.div`
-  background: ${(props) =>
-    props.darkMode
-      ? "linear-gradient(135deg, #232526 0%, #414345 100%)"
-      : "rgba(255, 255, 255, 0.95)"};
-  color: ${(props) => (props.darkMode ? "#fff" : "#222")};
-  padding: 38px;
+import { useEffect, useState, memo } from "react";
+import { X } from "lucide-react";
+import { NEWS_REGIONS, NEWS_TOPICS } from "./feeds";
 
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  font-family: "Segoe UI", sans-serif;
-  margin-top: 5px;
-  border-radius: 20px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transform: translate3d(0, 0, 0);
-  will-change: transform, opacity;
+export const DEFAULT_BACKGROUND = "./11.jpg";
 
-  /* Entrance animation */
-  opacity: 0;
-  animation: slideInRight 0.6s ease-out forwards;
+const CLOCK_STYLES = [
+  { value: 0, label: "Analog" },
+  { value: 1, label: "Digital" },
+  { value: 2, label: "Both" },
+];
 
-  @keyframes slideInRight {
-    from {
-      opacity: 0;
-      transform: translate3d(100%, 0, 0);
-    }
-    to {
-      opacity: 1;
-      transform: translate3d(0, 0, 0);
-    }
-  }
-`;
+const APPEARANCES = [
+  { value: "auto", label: "Auto" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
 
-const SettingsHeader = styled.div`
-  display: flex;
-  align-items: left;
-  justify-content: left;
-  font-size: 22px;
-  background: rgba(19, 63, 25, 1);
-  gap: 12px;
-  margin-bottom: 25px;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  opacity: 0;
-  animation: fadeInUp 0.5s ease-out forwards;
-  animation-delay: 0.3s;
-
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translate3d(0, 20px, 0);
-    }
-    to {
-      opacity: 1;
-      transform: translate3d(0, 0, 0);
-    }
-  }
-`;
-
-const TitleHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 27px;
-  background: rgba(8, 122, 24, 1);
-  gap: 12px;
-  margin-bottom: 25px;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  opacity: 0;
-  animation: fadeInUp 0.6s ease-out forwards;
-  animation-delay: 0.1s;
-`;
-
-const ToggleContainer = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  opacity: 0;
-  animation: fadeInUp 0.5s ease-out forwards;
-  animation-delay: 0.4s;
-  transform: translate3d(0, 0, 0);
-  transition: all 0.3s ease;
-
-  &:hover {
-    transform: translate3d(0, -2px, 0);
-  }
-`;
-
-const ToggleLabel = styled.label`
-  font-size: 14px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-`;
-
-const Toggle = styled.div`
-  position: relative;
-  width: 50px;
-  height: 25px;
-  background: ${(props) =>
-    props.checked ? "#4CAF50" : props.darkMode ? "#555" : "#ccc"};
-  border-radius: 25px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: translate3d(0, 0, 0);
-
-  &:hover {
-    transform: translate3d(0, 0, 0) scale(1.05);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  }
-
-  &:active {
-    transform: translate3d(0, 0, 0) scale(0.95);
-  }
-
-  &::after {
-    content: "";
-    position: absolute;
-    top: 2px;
-    left: ${(props) => (props.checked ? "27px" : "2px")};
-    width: 21px;
-    height: 21px;
-    background: white;
-    border-radius: 50%;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    transform: translate3d(0, 0, 0);
-  }
-
-  &:hover::after {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
-`;
-
-const SelectContainer = styled.div`
-  margin-bottom: 16px;
-`;
-
-const SelectLabel = styled.label`
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 8px;
-  color: ${(props) => (props.darkMode ? "#e8e8e8" : "#333")};
-`;
-
-const ImageSection = styled.div`
-  margin-bottom: 16px;
-`;
-
-const ImagePreview = styled.div`
-  width: 100%;
-  height: 120px;
-  border: 2px dashed ${(props) => (props.darkMode ? "#555" : "#ddd")};
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 12px;
-  background: ${(props) =>
-    props.image ? `url(${props.image})` : props.darkMode ? "#333" : "#f8f8f8"};
-  background-size: cover;
-  background-position: center;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: translate3d(0, 0, 0);
-  opacity: 0;
-  animation: fadeInUp 0.6s ease-out forwards;
-  animation-delay: 0.5s;
-
-  &:hover {
-    border-color: #667eea;
-    transform: translate3d(0, -2px, 0);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-  }
-`;
-
-const ImagePlaceholder = styled.div`
-  text-align: center;
-  color: ${(props) => (props.darkMode ? "#777" : "#999")};
-  font-size: 14px;
-  display: ${(props) => (props.hasImage ? "none" : "block")};
-`;
-
-const FileInput = styled.input`
-  display: none;
-`;
-
-const FileInputLabel = styled.label`
-  display: inline-block;
-  padding: 10px 16px;
-  background: transparent;
-  color: ${(props) => (props.darkMode ? "#fff" : "#333")};
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  margin-right: 10px;
-  transform: translate3d(0, 0, 0);
-  border: 1px solid ${(props) => (props.darkMode ? "#555" : "#ddd")};
-
-  &:hover {
-    transform: translate3d(0, -2px, 0);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-    border-color: #667eea;
-    background: ${(props) =>
-      props.darkMode
-        ? "rgba(102, 126, 234, 0.1)"
-        : "rgba(102, 126, 234, 0.05)"};
-  }
-
-  &:active {
-    transform: translate3d(0, 0, 0);
-  }
-`;
-
-const ActionButton = styled.button`
-  width: 100%;
-  background: transparent;
-  border: 1px solid rgba(67, 206, 162, 0.3);
-  border-radius: 8px;
-  padding: ${(props) => (props.compact ? "8px 0" : "14px 0")};
-  font-weight: bold;
-  font-size: 16px;
-  letter-spacing: 1px;
-  cursor: pointer;
-  box-shadow: 0 2px 12px rgba(67, 206, 162, 0.12);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transform: translate3d(0, 0, 0);
-  opacity: 0;
-  animation: fadeInUp 0.5s ease-out forwards;
-  animation-delay: 0.6s;
-  position: relative;
-  overflow: hidden;
-
-  &::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(67, 206, 162, 0.1),
-      transparent
-    );
-    transition: left 0.5s;
-  }
-
-  &:hover {
-    transform: translate3d(0, -2px, 0);
-    box-shadow: 0 8px 25px rgba(67, 206, 162, 0.3);
-    border-color: rgba(67, 206, 162, 0.6);
-
-    &::before {
-      left: 100%;
-    }
-  }
-
-  &:active {
-    transform: translate3d(0, 0, 0);
-  }
-`;
-
-// Notification Component with smooth animations
-const NotificationContainer = styled.div`
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  background: ${(props) =>
-    props.type === "error"
-      ? "linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)"
-      : "linear-gradient(135deg, #4CAF50 0%, #45a049 100%)"};
-  color: white;
-  font-weight: 500;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  transform: translate3d(100%, 0, 0);
-  animation: slideInNotification 0.3s ease-out forwards;
-  backdrop-filter: blur(10px);
-
-  @keyframes slideInNotification {
-    to {
-      transform: translate3d(0, 0, 0);
-    }
-  }
-
-  &.fade-out {
-    animation: slideOutNotification 0.3s ease-in forwards;
-  }
-
-  @keyframes slideOutNotification {
-    to {
-      transform: translate3d(100%, 0, 0);
-      opacity: 0;
-    }
-  }
-`;
+function Segmented({ name, options, value, onChange, legend }) {
+  return (
+    <div className="segmented" role="radiogroup" aria-label={legend}>
+      {options.map((option) => (
+        <label key={option.value}>
+          <input
+            type="radio"
+            name={name}
+            value={option.value}
+            checked={value === option.value}
+            onChange={() => onChange(option.value)}
+          />
+          {option.label}
+        </label>
+      ))}
+    </div>
+  );
+}
 
 function BarMenuSettings({
-  action,
-  changeHorlogeStyle,
-  setState,
-  state,
+  onClose,
+  clockStyle,
+  setClockStyle,
+  city,
+  setCity,
+  appearance,
+  setAppearance,
   backgroundImage,
   setBackgroundImage,
-  backgroundTheme,
+  onTidyShortcuts,
+  notify,
+  calendarUrl,
+  setCalendarUrl,
+  newsRegion,
+  setNewsRegion,
+  newsTopics,
+  setNewsTopics,
+  visibleWidgets,
+  setVisibleWidgets,
+  focusSection,
+  isExtension,
 }) {
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem("darkMode");
-    return saved ? JSON.parse(saved) : false;
-  });
+  const [cityDraft, setCityDraft] = useState(city);
+  const [calendarDraft, setCalendarDraft] = useState(calendarUrl);
 
-  const [compactMode, setCompactMode] = useState(() => {
-    const saved = localStorage.getItem("compactMode");
-    return saved ? JSON.parse(saved) : false;
-  });
+  const handleCalendar = (e) => {
+    e.preventDefault();
+    const next = calendarDraft.trim();
+    if (next && !/^(https|webcal):\/\/\S+$/i.test(next)) {
+      notify("Paste the full address, starting with https:// or webcal://.", "error");
+      return;
+    }
+    setCalendarUrl(next);
+    notify(next ? "Calendar connected" : "Calendar removed");
+  };
 
-  const [notification, setNotification] = useState("");
-  const [newState, setNewState] = useState(state);
+  // Keeps the chosen topics in the order NEWS_TOPICS lists them
+  const toggleTopic = (id) =>
+    setNewsTopics((current) =>
+      NEWS_TOPICS.map((t) => t.id).filter((t) =>
+        t === id ? !current.includes(id) : current.includes(t)
+      )
+    );
 
-  // Save to localStorage whenever settings change
+  const toggleWidget = (key) =>
+    setVisibleWidgets((w) => ({ ...w, [key]: !w[key] }));
+
   useEffect(() => {
-    localStorage.setItem("darkMode", JSON.stringify(darkMode));
-  }, [darkMode]);
-
-  useEffect(() => {
-    localStorage.setItem("compactMode", JSON.stringify(compactMode));
-  }, [compactMode]);
-
-  useEffect(() => {
-    localStorage.setItem("selectedCountry", state);
-  }, [state]);
-
-  useEffect(() => {
-    localStorage.setItem("backgroundImage", backgroundImage);
-  }, [backgroundImage]);
-
-  const handleImageUpload = useCallback(
-    (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        if (file.size > 5 * 1024 * 1024) {
-          // 5MB limit
-          showNotification("Please select an image smaller than 5MB", "error");
-          return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          setBackgroundImage(event.target.result);
-          showNotification("Background image updated!", "success");
-        };
-        reader.readAsDataURL(file);
-      }
-    },
-    [setBackgroundImage]
-  );
-
-  const removeImage = useCallback(() => {
-    setBackgroundImage("./11.jpg"); // Reset to default background
-    showNotification("Background reset to default", "success");
-  }, [setBackgroundImage]);
-
-  const showNotification = useCallback((message, type = "success") => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(""), 3000);
-  }, []);
-
-  const handleSaveSettings = useCallback(() => {
-    if (newState) setState(newState);
-    showNotification("All settings saved successfully!", "success");
-  }, [newState, setState, showNotification]);
-
-  // Memoize background theme computation for performance
-  const backgroundThemeStyle = useMemo(() => {
-    if (!backgroundTheme) return {};
-
-    return {
-      padding: "12px",
-      marginBottom: "16px",
-      borderRadius: "8px",
-      background: `linear-gradient(135deg, ${backgroundTheme.dominantColor}20, ${backgroundTheme.accentColor}10)`,
-      border: `1px solid ${backgroundTheme.accentColor}30`,
-      color: backgroundTheme.textColor,
-      fontSize: "12px",
-      fontWeight: "500",
-      opacity: 0,
-      animation: "fadeInUp 0.5s ease-out forwards",
-      animationDelay: "0.7s",
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
     };
-  }, [backgroundTheme]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const handleCity = (e) => {
+    e.preventDefault();
+    const next = cityDraft.trim();
+    if (!next || next === city) return;
+    setCity(next);
+    notify(`Showing prayer times for ${next}`);
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      notify("Choose an image under 5 MB.", "error");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setBackgroundImage(event.target.result);
+      notify("Wallpaper changed");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const isCustomWallpaper = backgroundImage !== DEFAULT_BACKGROUND;
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "flex-end",
-        width: "100%",
-      }}
-      className="settings-container"
-    >
-      <SettingsContainer darkMode={darkMode} style={{ position: "relative" }}>
-        {/* Top-right ActionButton */}
-        <div style={{ position: "absolute", top: 16, right: 16, zIndex: 2 }}>
-          <ActionButton
-            compact={compactMode}
-            onClick={action}
-            style={{
-              background: "transparent",
-              marginBottom: 0,
-              width: "40px",
-              height: "40px",
-              color: darkMode ? "#545353ff" : "#333",
-              fontSize: "22px",
-              padding: 7,
-              minWidth: 0,
-              justifyContent: "center",
-            }}
-          >
-            <HiMiniArrowLongRight />
-          </ActionButton>
-        </div>
-        <TitleHeader>Settings Panel</TitleHeader>
+    <aside className="settings glass glass--thick" aria-labelledby="settings-title">
+      <div className="settings__head">
+        <h2 id="settings-title">Settings</h2>
+        <button
+          type="button"
+          className="icon-button"
+          onClick={onClose}
+          aria-label="Close settings"
+        >
+          <X aria-hidden="true" />
+        </button>
+      </div>
 
-        {notification && (
-          <div
-            style={{
-              padding: "12px",
-              borderRadius: "8px",
-              marginBottom: "16px",
-              background:
-                notification.type === "success" ? "#d4edda" : "#f8d7da",
-              color: notification.type === "success" ? "#155724" : "#721c24",
-              border: `1px solid ${notification.type === "success" ? "#c3e6cb" : "#f5c6cb"}`,
-              fontSize: "14px",
-              fontWeight: "500",
-            }}
-          >
-            {notification.message}
-          </div>
-        )}
-
-        <ActionButton compact={compactMode} onClick={changeHorlogeStyle}>
-          <SelectLabel darkMode={darkMode}>🕐 Change Horloge Style</SelectLabel>
-        </ActionButton>
-        <ActionButton compact={compactMode} onClick={handleSaveSettings}>
-          <SelectLabel darkMode={darkMode}>💾 Save All Settings</SelectLabel>
-        </ActionButton>
-
-        <SettingsHeader>Appearance</SettingsHeader>
-
-        <ToggleContainer>
-          <ToggleLabel>🌙 Dark Mode</ToggleLabel>
-          <Toggle
-            checked={darkMode}
-            darkMode={darkMode}
-            onClick={() => setDarkMode(!darkMode)}
+      <div className="settings__body">
+        <section className="settings__section">
+          <h3>Appearance</h3>
+          <Segmented
+            name="appearance"
+            legend="Appearance"
+            options={APPEARANCES}
+            value={appearance}
+            onChange={setAppearance}
           />
-        </ToggleContainer>
+          <p className="settings__hint">
+            Auto picks light or dark glass to suit your wallpaper.
+          </p>
+        </section>
 
-        {/* <ToggleContainer>
-          <ToggleLabel>📱 Compact Mode</ToggleLabel>
-          <Toggle
-            checked={compactMode}
-            darkMode={darkMode}
-            onClick={() => setCompactMode(!compactMode)}
+        <section className="settings__section">
+          <h3>Clock</h3>
+          <Segmented
+            name="clock"
+            legend="Clock style"
+            options={CLOCK_STYLES}
+            value={clockStyle}
+            onChange={setClockStyle}
           />
-        </ToggleContainer> */}
+        </section>
 
-        <SettingsHeader>Location</SettingsHeader>
-
-        <SelectContainer>
-          <SelectLabel darkMode={darkMode}>Select Your City</SelectLabel>
-          <input
-            type="text"
-            placeholder="Enter your city"
-            onChange={(e) => setNewState(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px",
-              borderRadius: "8px",
-              border: "1px solid #ccc",
-            }}
-          />
-        </SelectContainer>
-        <SettingsHeader>Background & Theme</SettingsHeader>
-
-        {backgroundTheme && (
-          <div style={backgroundThemeStyle}>
-            <div
-              style={{
-                fontSize: "14px",
-                fontWeight: "500",
-                marginBottom: "8px",
-                color: darkMode ? "#fff" : "#333",
-              }}
-            >
-              🎨 Current Theme Analysis
+        <section className="settings__section">
+          <h3>Prayer times</h3>
+          <form className="settings__group" onSubmit={handleCity}>
+            <div className="settings__row">
+              <label className="visually-hidden" htmlFor="settings-city">
+                City
+              </label>
+              <input
+                id="settings-city"
+                type="text"
+                value={cityDraft}
+                onChange={(e) => setCityDraft(e.target.value)}
+                placeholder="City"
+                autoComplete="address-level2"
+              />
+              <button
+                type="submit"
+                className="button button--primary button--small"
+                disabled={!cityDraft.trim() || cityDraft.trim() === city}
+              >
+                Update
+              </button>
             </div>
-            <div
-              style={{
-                fontSize: "12px",
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "4px",
-                color: darkMode ? "#e8e8e8" : "#666",
-              }}
-            >
-              <span>
-                Brightness:{" "}
-                {backgroundTheme.brightness > 128 ? "☀️ Light" : "🌙 Dark"}
-              </span>
-              <span>
-                Dominant:{" "}
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: "12px",
-                    height: "12px",
-                    backgroundColor: backgroundTheme.dominantColor,
-                    borderRadius: "2px",
-                    marginLeft: "4px",
-                    border: "1px solid #ccc",
-                  }}
-                ></span>
-              </span>
+          </form>
+        </section>
+
+        <section className="settings__section">
+          <h3>Calendar</h3>
+          <form className="settings__group" onSubmit={handleCalendar}>
+            <div className="settings__row">
+              <label className="visually-hidden" htmlFor="settings-calendar">
+                Calendar iCal address
+              </label>
+              <input
+                id="settings-calendar"
+                type="text"
+                value={calendarDraft}
+                onChange={(e) => setCalendarDraft(e.target.value)}
+                placeholder="Secret iCal address"
+                spellCheck="false"
+                autoFocus={focusSection === "calendar"}
+              />
+              <button
+                type="submit"
+                className="button button--primary button--small"
+                disabled={calendarDraft.trim() === calendarUrl}
+              >
+                {calendarDraft.trim() === calendarUrl && calendarUrl
+                  ? "Connected"
+                  : calendarDraft.trim() || !calendarUrl
+                    ? "Connect"
+                    : "Remove"}
+              </button>
+            </div>
+          </form>
+          <p className="settings__hint">
+            In Google Calendar, open Settings, pick your calendar, and copy
+            “Secret address in iCal format”. Outlook and iCloud calendars work
+            too. The address stays in this browser
+            {isExtension ? "." : " and is read through this site's own server."}
+          </p>
+        </section>
+
+        <section className="settings__section">
+          <h3>News</h3>
+          <div className="settings__group">
+            <div className="settings__row">
+              <label htmlFor="settings-region">Region</label>
+              <select
+                id="settings-region"
+                value={newsRegion}
+                onChange={(e) => setNewsRegion(e.target.value)}
+              >
+                {NEWS_REGIONS.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        )}
-
-        <ImageSection>
-          <ImagePreview darkMode={darkMode} image={backgroundImage}>
-            <ImagePlaceholder
-              darkMode={darkMode}
-              hasImage={backgroundImage && backgroundImage !== "./11.jpg"}
-            >
-              📸 Click to upload background image
-            </ImagePlaceholder>
-          </ImagePreview>
-
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            <FileInputLabel htmlFor="imageUpload">
-              <ToggleLabel style={{ color: darkMode ? "#fff" : "#333" }}>
-                📁 Upload Image
-                <FileInput
-                  id="imageUpload"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
+          <div className="settings__group settings__topics">
+            {NEWS_TOPICS.map((t) => (
+              <label key={t.id} className="settings__row">
+                {t.label}
+                <input
+                  type="checkbox"
+                  className="switch"
+                  role="switch"
+                  checked={newsTopics.includes(t.id)}
+                  disabled={newsTopics.length === 1 && newsTopics.includes(t.id)}
+                  onChange={() => toggleTopic(t.id)}
                 />
-              </ToggleLabel>
-            </FileInputLabel>
+              </label>
+            ))}
+          </div>
+          <p className="settings__hint">
+            Topics are searched in the region's language. Pick United Kingdom
+            or United States for English stories.
+          </p>
+        </section>
 
-            {backgroundImage && backgroundImage !== "./11.jpg" && (
-              <ActionButton
-                compact
-                onClick={removeImage}
-                style={{
-                  width: "auto",
-                  padding: "10px 16px",
-                  background:
-                    "linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)",
-                  margin: 0,
+        <section className="settings__section">
+          <h3>Widgets</h3>
+          <div className="settings__group">
+            {[
+              ["agenda", "Upcoming events"],
+              ["news", "News and trending"],
+            ].map(([key, label]) => (
+              <label key={key} className="settings__row">
+                {label}
+                <input
+                  type="checkbox"
+                  className="switch"
+                  role="switch"
+                  checked={Boolean(visibleWidgets[key])}
+                  onChange={() => toggleWidget(key)}
+                />
+              </label>
+            ))}
+          </div>
+        </section>
+
+        <section className="settings__section">
+          <h3>Wallpaper</h3>
+          <span
+            className="wallpaper-preview"
+            style={{ backgroundImage: `url(${backgroundImage})` }}
+            role="img"
+            aria-label="Current wallpaper"
+          />
+          <div className="wallpaper-actions">
+            <label className="button button--plain button--small file-button">
+              Choose image
+              <input type="file" accept="image/*" onChange={handleImageUpload} />
+            </label>
+            {isCustomWallpaper && (
+              <button
+                type="button"
+                className="button button--plain button--small"
+                onClick={() => {
+                  setBackgroundImage(DEFAULT_BACKGROUND);
+                  notify("Wallpaper reset");
                 }}
               >
-                <GrClearOption /> Reset
-              </ActionButton>
+                Use default
+              </button>
             )}
           </div>
-        </ImageSection>
-      </SettingsContainer>
+        </section>
 
-      {/* Optimized Notification System */}
-      {notification && (
-        <NotificationContainer type={notification.type}>
-          {notification.message}
-        </NotificationContainer>
-      )}
-    </div>
+        <section className="settings__section">
+          <h3>Shortcuts</h3>
+          <button
+            type="button"
+            className="button button--plain button--small"
+            onClick={onTidyShortcuts}
+          >
+            Arrange in a grid
+          </button>
+          <p className="settings__hint">
+            Drag shortcuts anywhere on the page. With the keyboard, focus one
+            and press Alt with the arrow keys.
+          </p>
+        </section>
+      </div>
+    </aside>
   );
 }
 

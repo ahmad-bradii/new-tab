@@ -14,8 +14,10 @@ const analyzeImage = (
     img.onload = () => {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
-      canvas.width = img.width;
-      canvas.height = img.height;
+      // The average colour doesn't need full resolution
+      const scale = Math.min(1, 64 / Math.max(img.width, img.height));
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
 
       if (!ctx) {
         resolve({
@@ -28,7 +30,7 @@ const analyzeImage = (
         return;
       }
 
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
       try {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -39,8 +41,7 @@ const analyzeImage = (
           b = 0;
         let pixelCount = 0;
 
-        // Sample every 10th pixel for performance
-        for (let i = 0; i < data.length; i += 40) {
+        for (let i = 0; i < data.length; i += 4) {
           r += data[i];
           g += data[i + 1];
           b += data[i + 2];

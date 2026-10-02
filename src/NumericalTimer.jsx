@@ -1,28 +1,19 @@
 import { useState, useEffect } from "react";
 
+const pad = (n) => String(n).padStart(2, "0");
+
 const NumericalTimer = () => {
-  const date = new Date();
-  const [minute, setMinute] = useState(date.getMinutes());
-  const [hour, setHour] = useState(date.getHours());
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newDate = new Date();
-      setMinute(newDate.getMinutes());
-      setHour(newDate.getHours());
-      ////console.log("newDate");
-    }, 1000);
-
+    const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="time">
-      <span>
-        {hour < 10 ? `0${hour}` : hour}:{minute < 10 ? `0${minute}` : minute}
-      </span>
-      {/* <Horloge /> */}
-    </div>
+    <time className="digital-time" dateTime={now.toISOString()}>
+      {pad(now.getHours())}:{pad(now.getMinutes())}
+    </time>
   );
 };
 

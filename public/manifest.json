@@ -1,19 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "My Custom Browser Page",
-  "version": "1.0",
-  "description": "Main page as a browser extension",
-  "action": {
-    "default_popup": "index.html",
-    "default_icon": {
-      "16": "icon.png",
-      "48": "icon.png",
-      "128": "icon.png"
-    }
-  },
+  "name": "Liquid New Tab",
+  "version": "2.0.0",
+  "description": "A Liquid Glass new tab with shortcuts, prayer times, Gmail notifications, your calendar and the news.",
   "chrome_url_overrides": {
-    "homepage": "index.html"
+    "newtab": "index.html"
+  },
+  "icons": {
+    "128": "favicon.png"
   },
   "permissions": ["storage"],
-  "host_permissions": ["*://*/*"]
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "https://news.google.com/*",
+    "https://trends.google.com/*",
+    "https://calendar.google.com/*",
+    "https://outlook.office365.com/*",
+    "https://outlook.live.com/*",
+    "https://*.icloud.com/*",
+    "https://api.bing.com/*",
+    "https://inputtools.google.com/*",
+    "https://search-api-r2w3.onrender.com/*"
+  ]
 }

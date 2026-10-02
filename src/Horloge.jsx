@@ -1,84 +1,28 @@
-import { useEffect, useRef } from "react";
+import { useMemo } from "react";
 
+// Each hand spins with a CSS animation whose negative delay starts it at the
+// current time, so the browser keeps it in sync without timers.
 const Horloge = () => {
-  // Use refs instead of state to avoid unnecessary re-renders
-  const styleRef = useRef(null);
-
-  useEffect(() => {
-    // Get initial time
+  const offsets = useMemo(() => {
     const now = new Date();
-    const second = now.getSeconds();
-    const minute = now.getMinutes();
-    const hour = now.getHours();
+    const s = now.getSeconds() + now.getMilliseconds() / 1000;
+    const m = now.getMinutes() * 60 + s;
+    const h = (now.getHours() % 12) * 3600 + m;
+    return { s, m, h };
+  }, []);
 
-    // Calculate initial angles
-    const secondDeg = second * 6;
-    const minuteDeg = minute * 6;
-    const hourDeg = hour * 30 + minute / 2;
-
-    // Create style element once
-    const styleEl = document.createElement("style");
-    styleRef.current = styleEl;
-
-    // Define all animations in one batch
-    styleEl.textContent = `
-      @keyframes rotateSecond {
-        from { transform: rotate(${secondDeg}deg); }
-        to { transform: rotate(${secondDeg + 360}deg); }
-      }
-      @keyframes rotateMinute {
-        from { transform: rotate(${minuteDeg}deg); }
-        to { transform: rotate(${minuteDeg + 360}deg); }
-      }
-      @keyframes rotateHour {
-        from { transform: rotate(${hourDeg}deg); }
-        to { transform: rotate(${hourDeg + 360}deg); }
-      }
-    `;
-
-    // Add to document
-    document.head.appendChild(styleEl);
-
-    // Set initial positions and animations directly using CSS classes
-    // to avoid multiple DOM operations
-    const secondHand = document.getElementById("second-hand");
-    const minuteHand = document.getElementById("minute-hand");
-    const hourHand = document.getElementById("hour-hand");
-
-    if (secondHand) {
-      secondHand.style.transform = `rotate(${secondDeg}deg)`;
-      secondHand.style.animation = "rotateSecond 60s linear infinite";
-    }
-
-    if (minuteHand) {
-      minuteHand.style.transform = `rotate(${minuteDeg}deg)`;
-      minuteHand.style.animation = "rotateMinute 3600s linear infinite";
-    }
-
-    if (hourHand) {
-      hourHand.style.transform = `rotate(${hourDeg}deg)`;
-      hourHand.style.animation = "rotateHour 43200s linear infinite";
-    }
-
-    // Clean up on unmount
-    return () => {
-      if (styleRef.current && document.head.contains(styleRef.current)) {
-        document.head.removeChild(styleRef.current);
-      }
-    };
-  }, []); // Empty dependency array ensures this runs only once
+  const hand = (period, offset) => ({
+    "--period": `${period}s`,
+    animationDelay: `-${offset}s`,
+  });
 
   return (
-    <div className="clock-dial ">
-      <div className="second-hand" id="second-hand">
-        <div className="hand-pointer" id="second"></div>
-      </div>
-      <div className="hour-hand" id="hour-hand">
-        <div className="hand-pointer" id="hour"></div>
-      </div>
-      <div className="minute-hand" id="minute-hand">
-        <div className="hand-pointer" id="minute"></div>
-      </div>
+    <div className="clock-face" role="img" aria-label="Analog clock">
+      <span className="clock-ticks" />
+      <span className="clock-hand clock-hand--hour" style={hand(43200, offsets.h)} />
+      <span className="clock-hand clock-hand--minute" style={hand(3600, offsets.m)} />
+      <span className="clock-hand clock-hand--second" style={hand(60, offsets.s)} />
+      <span className="clock-cap" />
     </div>
   );
 };

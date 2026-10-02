@@ -1,55 +1,44 @@
-import { useState } from "react";
-import GoogleAppsMenu from "./GoogleAppsMenu"; // Your existing menu component
-
-// A simple representation of the waffle icon (you could use an SVG)
-const WaffleIcon = () => (
-  <svg focusable="false" viewBox="0 0 24 24" width="24px" height="24px">
-    <path d="M6,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM6,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM6,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM18,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM18,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM18,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2z"></path>
-  </svg>
-);
+import { useEffect, useRef, useState } from "react";
+import { Grip } from "lucide-react";
+import GoogleAppsMenu from "./GoogleAppsMenu";
 
 function GoogleAppsLauncher() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const wrapperRef = useRef(null);
 
-  // Function to close the menu
-  const closeMenu = () => {
-    setIsMenuOpen(false);
-  };
-
-  // Attach the ref from the hook to the menu's container div
-  window.onclick = (e) => {
-    if (isMenuOpen && e.target.closest(".apps-launcher-wrapper") === null) {
-      closeMenu(); // Close the menu if clicked outside
-    }
-  };
-
-  // Toggle function for the button
-  const toggleMenu = () => {
-    // Prevent click from immediately triggering outside click
-    setIsMenuOpen((prev) => !prev);
-  };
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const onPointerDown = (e) => {
+      if (!wrapperRef.current?.contains(e.target)) setIsMenuOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setIsMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [isMenuOpen]);
 
   return (
-    <div className="apps-launcher-wrapper">
-      {/* Relative positioning context */}
+    <div className="apps-launcher" ref={wrapperRef}>
       <button
-        className="apps-launcher-button"
-        onClick={toggleMenu}
+        type="button"
+        className="icon-button"
+        onClick={() => setIsMenuOpen((open) => !open)}
         aria-label="Google apps"
         aria-haspopup="true"
         aria-expanded={isMenuOpen}
+        title="Google apps"
       >
-        <WaffleIcon /> {/* Waffle icon */}
+        <Grip aria-hidden="true" />
       </button>
-      {/* Conditionally render the menu and attach the ref */}
-      {isMenuOpen ? (
-        // IMPORTANT: Pass the ref from useClickOutside to the element you want to detect clicks outside of
-        // We apply it to the container *around* GoogleAppsMenu defined in GoogleAppsMenu.css
-        <div className="apps-menu-popover">
+      {isMenuOpen && (
+        <div className="apps-popover glass glass--thick">
           <GoogleAppsMenu />
         </div>
-      ) : (
-        <div></div>
       )}
     </div>
   );

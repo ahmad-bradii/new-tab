@@ -45,8 +45,30 @@ export const updateShortcut = async (id, updatedShortcut) => {
     return null;
   }
 
-  const newShortcut = { ...updatedShortcut, id };
+  // Merge so fields the caller didn't send (order, pos) survive an edit
+  const newShortcut = { ...currentShortcut, ...updatedShortcut, id };
   await db.put("shortcuts", newShortcut);
+};
+
+// pos is the grid cell { col, row } under the search bar
+export const updateShortcutPosition = async (id, pos) => {
+  const db = await dbPromise;
+  const shortcut = await db.get("shortcuts", id);
+  if (!shortcut) return;
+  await db.put("shortcuts", { ...shortcut, pos });
+};
+
+export const clearShortcutPositions = async () => {
+  const db = await dbPromise;
+  const tx = db.transaction("shortcuts", "readwrite");
+  const shortcuts = await tx.store.getAll();
+  for (const shortcut of shortcuts) {
+    if (shortcut.pos) {
+      delete shortcut.pos;
+      await tx.store.put(shortcut);
+    }
+  }
+  await tx.done;
 };
 
 export const deleteShortcut = async (id) => {
